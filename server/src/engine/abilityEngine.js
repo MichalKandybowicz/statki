@@ -58,29 +58,40 @@ function shuffle(array) {
 }
 
 function getLinePoints(start, end) {
-  const points = [];
-  let x0 = start.x;
-  let y0 = start.y;
-  const x1 = end.x;
-  const y1 = end.y;
+  // Supercover line: includes all cells touched by the ray between two grid points.
+  // This prevents sonar from "seeing through" rocks at diagonal/corner intersections.
+  const points = [{ x: start.x, y: start.y }];
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
 
-  const dx = Math.abs(x1 - x0);
-  const dy = Math.abs(y1 - y0);
-  const sx = x0 < x1 ? 1 : -1;
-  const sy = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
+  const nx = Math.abs(dx);
+  const ny = Math.abs(dy);
+  const signX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
+  const signY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
 
-  while (!(x0 === x1 && y0 === y1)) {
-    const e2 = err * 2;
-    if (e2 > -dy) {
-      err -= dy;
-      x0 += sx;
+  let x = start.x;
+  let y = start.y;
+  let ix = 0;
+  let iy = 0;
+
+  while (ix < nx || iy < ny) {
+    const decision = (1 + 2 * ix) * ny - (1 + 2 * iy) * nx;
+
+    if (decision === 0) {
+      x += signX;
+      y += signY;
+      ix++;
+      iy++;
+      points.push({ x, y });
+    } else if (decision < 0) {
+      x += signX;
+      ix++;
+      points.push({ x, y });
+    } else {
+      y += signY;
+      iy++;
+      points.push({ x, y });
     }
-    if (e2 < dx) {
-      err += dx;
-      y0 += sy;
-    }
-    points.push({ x: x0, y: y0 });
   }
 
   return points;
@@ -88,7 +99,8 @@ function getLinePoints(start, end) {
 
 function isBlockedByObstacle(hiddenBoard, start, end) {
   const line = getLinePoints(start, end);
-  for (let i = 0; i < line.length - 1; i++) {
+  // Skip start point and destination point.
+  for (let i = 1; i < line.length - 1; i++) {
     const point = line[i];
     if (isVisionBlockingTile(hiddenBoard[point.y]?.[point.x])) {
       return true;

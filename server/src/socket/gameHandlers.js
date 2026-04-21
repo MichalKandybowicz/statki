@@ -40,6 +40,14 @@ function emitTurnUpdateToPlayers(io, connectedUsers, game, turnPlayerId) {
   }
 }
 
+async function closeRoomAfterGame(io, roomId) {
+  const roomIdStr = roomId.toString();
+  stagedFleets.delete(roomIdStr);
+  await Room.deleteOne({ _id: roomId });
+  // Lobby listens to room_update and refetches list.
+  io.emit('room_update', { roomId: roomIdStr, closed: true });
+}
+
 function clearTurnTimer(turnTimers, gameId) {
   const existing = turnTimers.get(gameId.toString());
   if (existing) {
@@ -67,7 +75,7 @@ function scheduleTurnTimer(io, connectedUsers, turnTimers, game, room) {
         freshGame.winnerId = winnerId;
         await freshGame.save();
 
-        await Room.findByIdAndUpdate(freshGame.roomId, { status: 'finished' });
+        await closeRoomAfterGame(io, freshGame.roomId);
 
         for (const pid of freshGame.players) {
           emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
@@ -258,7 +266,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         game.winnerId = winnerId;
         await game.save();
 
-        await Room.findByIdAndUpdate(game.roomId, { status: 'finished' });
+        await closeRoomAfterGame(io, game.roomId);
         clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {
@@ -396,7 +404,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         game.status = 'finished';
         game.winnerId = winnerId;
         await game.save();
-        await Room.findByIdAndUpdate(game.roomId, { status: 'finished' });
+        await closeRoomAfterGame(io, game.roomId);
         clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {

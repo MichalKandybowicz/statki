@@ -153,4 +153,32 @@ function assert(condition, message) {
   assert(game.fleets.get('A')[1].cooldownRemaining === 6, 'size 6 sonar should set cooldown to 6');
 })();
 
+(function testSonarDoesNotDetectShipBehindRock() {
+  const game = makeGame(9);
+  const sonarShip = game.fleets.get('A')[1];
+  sonarShip.positions = [
+    { x: 0, y: 8 },
+    { x: 1, y: 8 },
+    { x: 2, y: 8 },
+    { x: 3, y: 8 },
+    { x: 4, y: 8 },
+    { x: 5, y: 8 },
+  ];
+  sonarShip.cooldownRemaining = 0;
+
+  // Enemy ship in line, but rock blocks line of sight.
+  game.fleets.set('B', [
+    { name: 'Ukryty', abilityType: 'target', positions: [{ x: 6, y: 2 }, { x: 7, y: 2 }], hits: [], isSunk: false, cooldownRemaining: 0 },
+  ]);
+
+  const hidden = makeBoard(9);
+  placeShips(hidden, game.fleets.get('B'));
+  hidden[5][3] = 'rock';
+  game.boards.get('B').hidden = hidden;
+
+  const sonar = useSonar(game, 'A', 1, { x: 0, y: 8 });
+  assert(sonar.positions.length === 0, 'sonar should not reveal ship hidden behind rock');
+  assert(sonar.blocked === true, 'sonar should report blocked when rock obstructs line of sight');
+})();
+
 console.log('ability tests ok')
