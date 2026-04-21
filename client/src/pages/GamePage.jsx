@@ -47,10 +47,10 @@ export default function GamePage() {
 
   const [error, setError] = useState('')
   const [sonarPositions, setSonarPositions] = useState([])
-  const [sonarMessage, setSonarMessage] = useState('')
   const [targetingMode, setTargetingMode] = useState(null)
   const [selectedShipIndex, setSelectedShipIndex] = useState(0)
   const [linearDirection, setLinearDirection] = useState('horizontal')
+  const [linearHoverStart, setLinearHoverStart] = useState(null)
 
   useEffect(() => {
     if (socket && gameId) socket.emit('reconnect_game', { gameId })
@@ -60,18 +60,10 @@ export default function GamePage() {
     if (!socket) return
 
     const onError = ({ message }) => setError(message)
-    const onSonar = ({ positions, type, nearest, scanCount, blocked, origin }) => {
+    const onSonar = ({ positions }) => {
       setSonarPositions(positions || [])
-      setSonarMessage(
-        nearest
-          ? `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} wykrył ${scanCount} sygnał(y). Najbliższy statek: ${String.fromCharCode(65 + nearest.y)}${nearest.x + 1}`
-          : blocked
-            ? `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} został zablokowany przez skały.`
-            : `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} nie wykrył żadnego statku.`
-      )
       setTimeout(() => {
         setSonarPositions([])
-        setSonarMessage('')
       }, 3500)
     }
 
@@ -99,10 +91,25 @@ export default function GamePage() {
   const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
 
   const pendingTargets = useMemo(() => targetingMode?.targets || [], [targetingMode])
+  const linearPreview = useMemo(() => {
+    if (!targetingMode || targetingMode.type !== 'linear' || !linearHoverStart || !selectedShip) {
+      return { positions: [], invalid: false }
+    }
+
+    const length = selectedShip.positions?.length || 1
+    const raw = Array.from({ length }, (_, step) => ({
+      x: linearHoverStart.x + (linearDirection === 'horizontal' ? step : 0),
+      y: linearHoverStart.y + (linearDirection === 'vertical' ? step : 0),
+    }))
+
+    const inBounds = raw.filter(({ x, y }) => x >= 0 && x < boardSize && y >= 0 && y < boardSize)
+    return { positions: inBounds, invalid: inBounds.length !== raw.length }
+  }, [targetingMode, linearHoverStart, selectedShip, linearDirection, boardSize])
 
   function handleEnemyClick(x, y) {
     if (targetingMode) {
       if (targetingMode.type === 'linear') {
+        if (linearPreview.invalid) return
         socket?.emit('use_ability', {
           gameId,
           shipIndex: targetingMode.shipIndex,
@@ -110,6 +117,7 @@ export default function GamePage() {
           orientation: linearDirection,
         })
         setTargetingMode(null)
+        setLinearHoverStart(null)
         return
       }
 
@@ -120,6 +128,7 @@ export default function GamePage() {
           targets: [{ x, y }],
         })
         setTargetingMode(null)
+        setLinearHoverStart(null)
         return
       }
 
@@ -142,16 +151,19 @@ export default function GamePage() {
 
     if (ship.abilityType === 'linear') {
       setTargetingMode({ type: 'linear', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
       return
     }
 
     if (ship.abilityType === 'sonar') {
       setTargetingMode({ type: 'sonar', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
       return
     }
 
     if (ship.abilityType === 'target') {
       setTargetingMode({ type: 'target', shipIndex, maxTargets: ship.positions?.length || 1, targets: [] })
+      setLinearHoverStart(null)
       return
     }
 
@@ -162,6 +174,7 @@ export default function GamePage() {
     if (!targetingMode || targetingMode.type !== 'target' || targetingMode.targets.length === 0) return
     socket?.emit('use_ability', { gameId, shipIndex: targetingMode.shipIndex, targets: targetingMode.targets })
     setTargetingMode(null)
+    setLinearHoverStart(null)
   }
 
   if (!myBoard && !enemyBoard && !isGameOver) {
@@ -198,6 +211,9 @@ export default function GamePage() {
                   ? 'kliknij pole, z którego ma pójść impuls sonaru'
                 : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
             </span>
+            {targetingMode.type === 'linear' && linearPreview.invalid && (
+              <span style={{ color: '#f87171' }}>Linia wychodzi poza planszę</span>
+            )}
             {targetingMode.type === 'linear' && (
               <div style={{ display:'flex', gap:'6px' }}>
                 <button onClick={() => setLinearDirection('horizontal')} style={{ ...directionBtnStyle, opacity: linearDirection === 'horizontal' ? 1 : 0.6 }}>Poziomo</button>
@@ -209,14 +225,8 @@ export default function GamePage() {
             {targetingMode.type === 'target' && (
               <button onClick={confirmTargetAbility} disabled={targetingMode.targets.length === 0} style={{ ...confirmBtnStyle, opacity: targetingMode.targets.length > 0 ? 1 : 0.5, cursor: targetingMode.targets.length > 0 ? 'pointer' : 'not-allowed' }}>Zatwierdź</button>
             )}
-            <button onClick={() => setTargetingMode(null)} style={{ background:'rgba(239,68,68,0.15)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Anuluj</button>
+            <button onClick={() => { setTargetingMode(null); setLinearHoverStart(null) }} style={{ background:'rgba(239,68,68,0.15)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Anuluj</button>
           </div>
-        </div>
-      )}
-
-      {sonarMessage && (
-        <div style={{ background:'rgba(20,83,45,0.12)', border:'1px solid rgba(34,197,94,0.25)', color:'#86efac', padding:'8px 14px', borderRadius:'8px', marginBottom:'12px', fontSize:'0.85rem' }}>
-          {sonarMessage}
         </div>
       )}
 
@@ -241,9 +251,18 @@ export default function GamePage() {
               tiles={enemyBoard}
               isOwnBoard={false}
               onTileClick={handleEnemyClick}
+              onTileHover={(x, y) => {
+                if (targetingMode?.type === 'linear') setLinearHoverStart({ x, y })
+              }}
+              onTileLeave={() => {
+                if (targetingMode?.type === 'linear') setLinearHoverStart(null)
+              }}
               boardSize={boardSize}
               sonarPositions={sonarPositions}
               targetPositions={pendingTargets}
+              previewPositions={targetingMode?.type === 'linear' ? linearPreview.positions : []}
+              previewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
+              isTargeting={!!targetingMode}
             />
           )}
         </div>

@@ -9,7 +9,19 @@ function getTileColor(tile, isOwnBoard) {
   }
 }
 
-export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, sonarPositions, targetPositions }) {
+export default function GameBoard({
+  tiles,
+  isOwnBoard,
+  onTileClick,
+  onTileHover,
+  onTileLeave,
+  boardSize,
+  sonarPositions,
+  targetPositions,
+  previewPositions,
+  previewInvalid,
+  isTargeting,
+}) {
   if (!tiles || !boardSize) return <div style={{ color: '#64748b', padding: '20px' }}>Loading board…</div>
 
   const tileSize = Math.max(18, Math.min(38, Math.floor(480 / boardSize)))
@@ -33,18 +45,35 @@ export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, s
             {row.map((tile, c) => {
               const isSonar = sonarPositions?.some(p => p.x === c && p.y === r)
               const isTargeted = targetPositions?.some(p => p.x === c && p.y === r)
+              const isPreview = previewPositions?.some(p => p.x === c && p.y === r)
               const displayTile = (!isOwnBoard && tile === 'ship') ? 'water' : tile
-              const bg = isSonar ? '#14532d' : isTargeted ? '#7c2d12' : getTileColor(displayTile, isOwnBoard)
-              const canClick = !isOwnBoard && (displayTile === 'water' || displayTile === 'rock')
+              const bg = isSonar
+                ? '#14532d'
+                : isTargeted
+                  ? '#7c2d12'
+                  : isPreview
+                    ? (previewInvalid ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)')
+                    : getTileColor(displayTile, isOwnBoard)
+
+              const isInteractive = !isOwnBoard && !!onTileClick
+              const canClick = isInteractive && (isTargeting ? true : (displayTile === 'water' || displayTile === 'rock'))
               return (
                 <div
                   key={c}
                   onClick={canClick ? () => onTileClick?.(c, r) : undefined}
+                  onMouseEnter={isInteractive ? () => onTileHover?.(c, r) : undefined}
+                  onMouseLeave={isInteractive ? () => onTileLeave?.() : undefined}
                   style={{
                     width: `${tileSize}px`,
                     height: `${tileSize}px`,
                     background: bg,
-                    border: isSonar ? '1px solid #22c55e' : isTargeted ? '1px solid #fb923c' : '1px solid rgba(255,255,255,0.05)',
+                    border: isSonar
+                      ? '1px solid #22c55e'
+                      : isTargeted
+                        ? '1px solid #fb923c'
+                        : isPreview
+                          ? (previewInvalid ? '1px solid #f87171' : '1px solid #4ade80')
+                          : '1px solid rgba(255,255,255,0.05)',
                     cursor: canClick ? 'crosshair' : 'default',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxSizing: 'border-box',

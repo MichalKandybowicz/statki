@@ -29,10 +29,9 @@ function validateShipForAbility(game, playerId, shipIndex) {
 
 /**
  * Sets a cooldown on a ship after using its ability.
- * Current turn counts toward cooldown progression, so we store cooldown-1.
  */
 function applyCooldown(fleet, shipIndex, cooldown = 1) {
-  fleet[shipIndex].cooldownRemaining = Math.max(0, cooldown - 1);
+  fleet[shipIndex].cooldownRemaining = Math.max(0, cooldown);
 }
 
 function getOpponentId(game, playerId) {
@@ -43,6 +42,19 @@ function getOpponentId(game, playerId) {
 
 function isShotTile(tile) {
   return tile === 'miss' || tile === 'hit' || tile === 'sunk';
+}
+
+function isVisionBlockingTile(tile) {
+  return tile === 'rock' || tile === 'sunk';
+}
+
+function shuffle(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 function getLinePoints(start, end) {
@@ -74,11 +86,11 @@ function getLinePoints(start, end) {
   return points;
 }
 
-function isBlockedByRock(hiddenBoard, start, end) {
+function isBlockedByObstacle(hiddenBoard, start, end) {
   const line = getLinePoints(start, end);
   for (let i = 0; i < line.length - 1; i++) {
     const point = line[i];
-    if (hiddenBoard[point.y]?.[point.x] === 'rock') {
+    if (isVisionBlockingTile(hiddenBoard[point.y]?.[point.x])) {
       return true;
     }
   }
@@ -230,7 +242,7 @@ function useSonar(game, playerId, shipIndex, target) {
     for (let x = 0; x < game.boardSize; x++) {
       const tile = hidden[y][x];
       if (tile === 'ship') {
-        const blocked = isBlockedByRock(hidden, target, { x, y });
+        const blocked = isBlockedByObstacle(hidden, target, { x, y });
         if (blocked) {
           blockedShipExists = true;
           continue;
@@ -246,8 +258,25 @@ function useSonar(game, playerId, shipIndex, target) {
     }
   }
 
-  candidates.sort((a, b) => a.dist - b.dist);
-  const revealed = candidates.slice(0, rules.scanCount);
+  const groupedByDistance = new Map();
+  for (const candidate of candidates) {
+    if (!groupedByDistance.has(candidate.dist)) {
+      groupedByDistance.set(candidate.dist, []);
+    }
+    groupedByDistance.get(candidate.dist).push(candidate);
+  }
+
+  const orderedDistances = [...groupedByDistance.keys()].sort((a, b) => a - b);
+  const revealed = [];
+  for (const distance of orderedDistances) {
+    const group = shuffle(groupedByDistance.get(distance));
+    for (const candidate of group) {
+      if (revealed.length >= rules.scanCount) break;
+      revealed.push(candidate);
+    }
+    if (revealed.length >= rules.scanCount) break;
+  }
+
   const positions = revealed.map(({ x, y }) => ({ x, y }));
   const detectedType = revealed[0]?.type || 'water';
 

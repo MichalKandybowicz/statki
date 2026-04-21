@@ -381,7 +381,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
 
           socket.emit('sonar_result', {
             ...sonarResult,
-            positions: sonarResult.nearest ? [sonarResult.nearest] : [],
+            positions: sonarResult.positions || [],
             fleet: game.fleets.get(userId) || [],
           });
           emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
