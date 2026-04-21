@@ -3,7 +3,7 @@ import { ships as shipsApi } from '../services/api'
 import ShipGrid from '../components/ships/ShipGrid.jsx'
 import ShipCard from '../components/ships/ShipCard.jsx'
 import { isContiguous, getShipCells } from '../utils/boardUtils.js'
-import { ABILITY_INFO, getAbilityInfo } from '../utils/abilityInfo.js'
+import { getAbilityCards, getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
 
 const EMPTY = () => Array.from({ length: 4 }, () => Array(4).fill(0))
 
@@ -76,8 +76,9 @@ export default function ShipBuilderPage() {
     setError('')
   }
 
-  const selectedAbility = getAbilityInfo(abilityType)
   const cellCount = getShipCells(shape).length
+  const selectedAbility = getAbilityInfo(abilityType, cellCount || 1)
+  const abilityCards = getAbilityCards(cellCount || 1)
   const inp = {
     width: '100%',
     background: '#0f1923',
@@ -121,7 +122,7 @@ export default function ShipBuilderPage() {
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '10px', marginBottom: '14px' }}>
-            {Object.values(ABILITY_INFO).map(ability => {
+            {abilityCards.map(ability => {
               const selected = ability.key === abilityType
               return (
                 <button
@@ -139,9 +140,10 @@ export default function ShipBuilderPage() {
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '6px' }}>
                     <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.88rem' }}>{ability.label}</span>
-                    <span style={{ color: '#fbbf24', fontSize: '0.75rem' }}>CD {ability.cooldown}</span>
+                    <span style={{ color: '#fbbf24', fontSize: '0.75rem' }}>CD {formatCooldownTurns(ability.cooldown)}</span>
                   </div>
                   <div style={{ color: '#94a3b8', fontSize: '0.76rem', lineHeight: 1.45 }}>{ability.description}</div>
+                  <div style={{ color: '#64748b', fontSize: '0.7rem', lineHeight: 1.4, marginTop: '6px' }}>{ability.requirement}</div>
                 </button>
               )
             })}
@@ -150,8 +152,9 @@ export default function ShipBuilderPage() {
           <div style={{ background: '#0f1923', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '10px', padding: '14px', marginBottom: '14px' }}>
             <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: '6px' }}>{selectedAbility.label}</div>
             <div style={{ color: '#94a3b8', fontSize: '0.82rem', lineHeight: 1.5, marginBottom: '8px' }}>{selectedAbility.description}</div>
-            <div style={{ color: '#fbbf24', fontSize: '0.8rem', marginBottom: '4px' }}>Cooldown: {selectedAbility.cooldown} tury</div>
+            <div style={{ color: '#fbbf24', fontSize: '0.8rem', marginBottom: '4px' }}>Cooldown: {formatCooldownTurns(selectedAbility.cooldown)}</div>
             <div style={{ color: '#64748b', fontSize: '0.76rem' }}>{selectedAbility.targeting}</div>
+            <div style={{ color: '#64748b', fontSize: '0.76rem', marginTop: '6px' }}>{selectedAbility.requirement}</div>
           </div>
 
           <div style={{ color: '#64748b', fontSize: '0.8rem', marginBottom: '12px' }}>Pola: {cellCount}/7</div>

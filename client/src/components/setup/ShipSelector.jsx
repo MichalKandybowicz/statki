@@ -1,5 +1,5 @@
 import ShipGrid from '../ships/ShipGrid.jsx'
-import { getAbilityInfo } from '../../utils/abilityInfo.js'
+import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
 export default function ShipSelector({ ships, onSelect, selectedShip, onDragStart }) {
   if (!ships || ships.length === 0) {
@@ -23,7 +23,7 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
           const selId = selectedShip?._id || selectedShip?.id
           const isSelected = id === selId
           const cells = ship.shape?.flat().filter(v => v === 1).length || 0
-          const ability = getAbilityInfo(ship.abilityType)
+          const ability = getAbilityInfo(ship.abilityType, ship.size || cells)
           return (
             <div
               key={id}
@@ -47,7 +47,7 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
               <div style={{ minWidth: 0 }}>
                 <div style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700, marginBottom: '2px' }}>{ship.name || 'Nienazwany statek'}</div>
                 <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: '2px' }}>{cells} pól · {ability.label}</div>
-                <div style={{ color: '#fbbf24', fontSize: '0.68rem', marginBottom: '3px' }}>CD: {ability.cooldown} tury</div>
+                <div style={{ color: '#fbbf24', fontSize: '0.68rem', marginBottom: '3px' }}>CD: {formatCooldownTurns(ability.cooldown)}</div>
                 <div style={{ color: '#64748b', fontSize: '0.68rem', lineHeight: 1.4 }}>{ability.description}</div>
               </div>
             </div>

@@ -1,9 +1,9 @@
 import ShipGrid from './ShipGrid.jsx'
-import { getAbilityInfo } from '../../utils/abilityInfo.js'
+import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
 export default function ShipCard({ ship, onDelete, onEdit }) {
   const cellCount = ship.shape?.flat().filter(v => v === 1).length || 0
-  const ability = getAbilityInfo(ship.abilityType)
+  const ability = getAbilityInfo(ship.abilityType, ship.size || cellCount)
 
   return (
     <div style={cardStyle}>
@@ -17,7 +17,7 @@ export default function ShipCard({ ship, onDelete, onEdit }) {
         <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '4px' }}>
           {cellCount} pól · {ability.label}
         </div>
-        <div style={{ color: '#fbbf24', fontSize: '0.74rem', marginBottom: '4px' }}>Cooldown: {ability.cooldown} tury</div>
+        <div style={{ color: '#fbbf24', fontSize: '0.74rem', marginBottom: '4px' }}>Cooldown: {formatCooldownTurns(ability.cooldown)}</div>
         <div style={{ color: '#64748b', fontSize: '0.74rem', lineHeight: 1.45 }}>
           {ability.description}
         </div>

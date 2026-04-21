@@ -1,4 +1,5 @@
 const Game = require('../models/Game');
+const { getAbilityCooldown } = require('./abilityConfig');
 
 const SKIP_LIMIT = 3;
 const INACTIVITY_DAYS = 3;
@@ -47,7 +48,7 @@ async function initGame(room, playerFleets, templateTiles = null) {
       abilityType: s.abilityType || null,
       hits: [],
       isSunk: false,
-      cooldownRemaining: 0,
+      cooldownRemaining: getAbilityCooldown(s.abilityType, s.positions?.length || 1),
     })));
     skips.set(playerId, 0);
   }

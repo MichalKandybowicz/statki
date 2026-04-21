@@ -1,4 +1,4 @@
-import { getAbilityInfo } from '../../utils/abilityInfo.js'
+import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
 export default function FleetPanel({ fleet, selectedShipIndex, onSelectShip }) {
   if (!fleet || fleet.length === 0) return null
@@ -10,7 +10,7 @@ export default function FleetPanel({ fleet, selectedShipIndex, onSelectShip }) {
         const hits = Array.isArray(ship.hits) ? ship.hits.length : Number(ship.hits || 0)
         const hp = total > 0 ? Math.max(0, ((total - hits) / total) * 100) : 100
         const hpColor = hp > 50 ? '#22c55e' : hp > 25 ? '#f59e0b' : '#ef4444'
-        const ability = getAbilityInfo(ship.abilityType)
+        const ability = getAbilityInfo(ship.abilityType, total)
         const isSelected = idx === selectedShipIndex
 
         return (
@@ -44,9 +44,9 @@ export default function FleetPanel({ fleet, selectedShipIndex, onSelectShip }) {
 
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '0.68rem' }}>
               <span style={{ color: '#fbbf24' }}>
-                {ship.cooldownRemaining > 0 ? `Gotowe za ${ship.cooldownRemaining} tur` : 'Umiejętność gotowa'}
+                {ship.cooldownRemaining > 0 ? `Gotowe za ${formatCooldownTurns(ship.cooldownRemaining)}` : 'Umiejętność gotowa'}
               </span>
-              <span style={{ color: '#64748b' }}>Bazowy CD: {ability.cooldown}</span>
+              <span style={{ color: '#64748b' }}>Bazowy CD: {formatCooldownTurns(ability.cooldown)}</span>
             </div>
           </button>
         )

@@ -7,7 +7,26 @@ import GameBoard from '../components/game/GameBoard.jsx'
 import FleetPanel from '../components/game/FleetPanel.jsx'
 import AbilityPanel from '../components/game/AbilityPanel.jsx'
 import TurnTimer from '../components/game/TurnTimer.jsx'
-import { getAbilityInfo } from '../utils/abilityInfo.js'
+import { getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
+
+const directionBtnStyle = {
+  background: 'rgba(37,99,235,0.15)',
+  color: '#60a5fa',
+  border: '1px solid rgba(37,99,235,0.25)',
+  borderRadius: '5px',
+  padding: '4px 10px',
+  cursor: 'pointer',
+  fontSize: '0.78rem',
+}
+
+const confirmBtnStyle = {
+  background: 'rgba(34,197,94,0.15)',
+  color: '#4ade80',
+  border: '1px solid rgba(34,197,94,0.25)',
+  borderRadius: '5px',
+  padding: '3px 10px',
+  fontSize: '0.78rem',
+}
 
 export default function GamePage() {
   const { gameId } = useParams()
@@ -31,6 +50,7 @@ export default function GamePage() {
   const [sonarMessage, setSonarMessage] = useState('')
   const [targetingMode, setTargetingMode] = useState(null)
   const [selectedShipIndex, setSelectedShipIndex] = useState(0)
+  const [linearDirection, setLinearDirection] = useState('horizontal')
 
   useEffect(() => {
     if (socket && gameId) socket.emit('reconnect_game', { gameId })
@@ -40,16 +60,13 @@ export default function GamePage() {
     if (!socket) return
 
     const onError = ({ message }) => setError(message)
-    const onSonar = ({ positions, type, nearest, fleet }) => {
+    const onSonar = ({ positions, type, nearest, scanCount }) => {
       setSonarPositions(positions || [])
       setSonarMessage(
         nearest
-          ? `Sonar wykrył ${type === 'ship' ? 'statek' : type === 'rock' ? 'skałę' : 'wodę'} w pobliżu pola ${String.fromCharCode(65 + nearest.y)}${nearest.x + 1}`
+          ? `Sonar wykrył ${type === 'ship' ? 'statek' : type === 'rock' ? 'skałę' : 'wodę'} — aktywnych skanów: ${scanCount}. Najbliższy sygnał: ${String.fromCharCode(65 + nearest.y)}${nearest.x + 1}`
           : 'Sonar nie wykrył żadnego celu.'
       )
-      if (fleet) {
-        // fleet sync idzie też przez turn_update, ale sonar daje natychmiastowy feedback
-      }
       setTimeout(() => {
         setSonarPositions([])
         setSonarMessage('')
@@ -77,22 +94,29 @@ export default function GamePage() {
   const isGameOver = status === 'finished' || !!winnerId
   const iWon = winnerId === myId
   const selectedShip = myFleet?.[selectedShipIndex] || null
-  const selectedAbility = getAbilityInfo(selectedShip?.abilityType)
+  const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
 
   const pendingTargets = useMemo(() => targetingMode?.targets || [], [targetingMode])
 
   function handleEnemyClick(x, y) {
     if (targetingMode) {
+      if (targetingMode.type === 'linear') {
+        socket?.emit('use_ability', {
+          gameId,
+          shipIndex: targetingMode.shipIndex,
+          targets: [{ x, y }],
+          orientation: linearDirection,
+        })
+        setTargetingMode(null)
+        return
+      }
+
       const alreadyChosen = targetingMode.targets.some(target => target.x === x && target.y === y)
       if (alreadyChosen) return
+      if (targetingMode.targets.length >= targetingMode.maxTargets) return
 
       const newTargets = [...targetingMode.targets, { x, y }]
-      if (newTargets.length >= targetingMode.maxTargets) {
-        socket?.emit('use_ability', { gameId, shipIndex: targetingMode.shipIndex, targets: newTargets })
-        setTargetingMode(null)
-      } else {
-        setTargetingMode(prev => ({ ...prev, targets: newTargets }))
-      }
+      setTargetingMode(prev => ({ ...prev, targets: newTargets }))
       return
     }
 
@@ -104,12 +128,23 @@ export default function GamePage() {
     const ship = myFleet?.[shipIndex]
     if (!ship) return
 
+    if (ship.abilityType === 'linear') {
+      setTargetingMode({ type: 'linear', shipIndex, maxTargets: 1, targets: [] })
+      return
+    }
+
     if (ship.abilityType === 'target') {
-      setTargetingMode({ shipIndex, maxTargets: 3, targets: [] })
+      setTargetingMode({ type: 'target', shipIndex, maxTargets: ship.positions?.length || 1, targets: [] })
       return
     }
 
     socket?.emit('use_ability', { gameId, shipIndex })
+  }
+
+  function confirmTargetAbility() {
+    if (!targetingMode || targetingMode.type !== 'target' || targetingMode.targets.length === 0) return
+    socket?.emit('use_ability', { gameId, shipIndex: targetingMode.shipIndex, targets: targetingMode.targets })
+    setTargetingMode(null)
   }
 
   if (!myBoard && !enemyBoard && !isGameOver) {
@@ -138,10 +173,25 @@ export default function GamePage() {
 
       {targetingMode && (
         <div style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', color:'#fbbf24', padding:'8px 14px', borderRadius:'8px', marginBottom:'12px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.85rem' }}>
-          <span>
-            🎯 {selectedShip?.name || `Statek ${targetingMode.shipIndex + 1}`} — wybierz jeszcze {targetingMode.maxTargets - targetingMode.targets.length} pól na planszy przeciwnika
-          </span>
-          <button onClick={() => setTargetingMode(null)} style={{ background:'rgba(239,68,68,0.15)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Anuluj</button>
+          <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
+            <span>
+              🎯 {selectedShip?.name || `Statek ${targetingMode.shipIndex + 1}`} — {targetingMode.type === 'linear'
+                ? `kliknij początek salwy (${linearDirection === 'horizontal' ? 'poziomo' : 'pionowo'}, długość ${selectedShip?.positions?.length || 1})`
+                : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
+            </span>
+            {targetingMode.type === 'linear' && (
+              <div style={{ display:'flex', gap:'6px' }}>
+                <button onClick={() => setLinearDirection('horizontal')} style={{ ...directionBtnStyle, opacity: linearDirection === 'horizontal' ? 1 : 0.6 }}>Poziomo</button>
+                <button onClick={() => setLinearDirection('vertical')} style={{ ...directionBtnStyle, opacity: linearDirection === 'vertical' ? 1 : 0.6 }}>Pionowo</button>
+              </div>
+            )}
+          </div>
+          <div style={{ display:'flex', gap:'8px' }}>
+            {targetingMode.type === 'target' && (
+              <button onClick={confirmTargetAbility} disabled={targetingMode.targets.length === 0} style={{ ...confirmBtnStyle, opacity: targetingMode.targets.length > 0 ? 1 : 0.5, cursor: targetingMode.targets.length > 0 ? 'pointer' : 'not-allowed' }}>Zatwierdź</button>
+            )}
+            <button onClick={() => setTargetingMode(null)} style={{ background:'rgba(239,68,68,0.15)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Anuluj</button>
+          </div>
         </div>
       )}
 
@@ -190,7 +240,8 @@ export default function GamePage() {
           <div style={{ flex:1, minWidth:'280px', background:'#1a2940', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'10px', padding:'14px' }}>
             <div style={{ color:'#64748b', fontSize:'0.72rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' }}>AKTYWNA UMIEJĘTNOŚĆ</div>
             <div style={{ color:'#e2e8f0', fontSize:'0.95rem', fontWeight:700, marginBottom:'4px' }}>{selectedShip.name || `Statek ${selectedShipIndex + 1}`}</div>
-            <div style={{ color:'#94a3b8', fontSize:'0.8rem', marginBottom:'10px' }}>{selectedAbility.label}</div>
+            <div style={{ color:'#94a3b8', fontSize:'0.8rem', marginBottom:'4px' }}>{selectedAbility.label}</div>
+            <div style={{ color:'#64748b', fontSize:'0.76rem', marginBottom:'10px' }}>Bazowy cooldown: {formatCooldownTurns(selectedAbility.cooldown)}</div>
             <AbilityPanel
               fleet={myFleet}
               selectedShipIndex={selectedShipIndex}

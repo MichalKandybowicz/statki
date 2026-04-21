@@ -117,6 +117,8 @@ async function startGameForRoom(io, room, connectedUsers, turnTimers) {
   stagedFleets.delete(roomId);
 
   const game = await initGame(room, playerFleets, templateTiles);
+  tickCooldowns(game, game.turn.toString());
+  await game.save();
 
   room.status = 'in_game';
   room.gameId = game._id;
@@ -337,7 +339,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
   });
 
   // use_ability
-  socket.on('use_ability', async ({ gameId, shipIndex, targets } = {}) => {
+  socket.on('use_ability', async ({ gameId, shipIndex, targets, orientation } = {}) => {
     try {
       if (!gameId || shipIndex === undefined) {
         return socket.emit('error', { message: 'gameId and shipIndex are required' });
@@ -360,7 +362,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
 
       switch (ship.abilityType) {
         case 'linear':
-          results = useLinearShot(game, userId, shipIndex);
+          results = useLinearShot(game, userId, shipIndex, targets?.[0], orientation);
           break;
         case 'random':
           results = useRandomShot(game, userId, shipIndex);

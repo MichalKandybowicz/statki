@@ -3,6 +3,7 @@ const ShipTemplate = require('../models/ShipTemplate');
 const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
 const { isContiguous, countCells } = require('../utils/floodFill');
+const { getAbilityRules } = require('../engine/abilityConfig');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -37,6 +38,20 @@ function validateName(name) {
   return null;
 }
 
+function validateAbilityForSize(abilityType, size) {
+  const validAbilities = ['linear', 'random', 'target', 'sonar'];
+  if (!validAbilities.includes(abilityType)) {
+    return 'Invalid abilityType';
+  }
+
+  const rules = getAbilityRules(abilityType, size);
+  if (size < rules.minSize) {
+    return `Ability ${abilityType} requires ship size >= ${rules.minSize}`;
+  }
+
+  return null;
+}
+
 // GET /api/ships
 router.get('/', async (req, res) => {
   try {
@@ -59,12 +74,10 @@ router.post('/', async (req, res) => {
     const shapeError = validateShape(shape);
     if (shapeError) return res.status(400).json({ error: shapeError });
 
-    const validAbilities = ['linear', 'random', 'target', 'sonar'];
-    if (!validAbilities.includes(abilityType)) {
-      return res.status(400).json({ error: 'Invalid abilityType' });
-    }
-
     const size = countCells(shape);
+    const abilityError = validateAbilityForSize(abilityType, size);
+    if (abilityError) return res.status(400).json({ error: abilityError });
+
     const ship = new ShipTemplate({ ownerId: req.user._id, name: name.trim(), shape, size, abilityType });
     await ship.save();
 
@@ -89,20 +102,24 @@ router.put('/:id', async (req, res) => {
       ship.name = name.trim();
     }
 
+    let nextSize = ship.size;
+    let nextAbilityType = abilityType !== undefined ? abilityType : ship.abilityType;
+
     if (shape !== undefined) {
       const shapeError = validateShape(shape);
       if (shapeError) return res.status(400).json({ error: shapeError });
       ship.shape = shape;
-      ship.size = countCells(shape);
+      nextSize = countCells(shape);
+      ship.size = nextSize;
     }
 
     if (abilityType !== undefined) {
-      const validAbilities = ['linear', 'random', 'target', 'sonar'];
-      if (!validAbilities.includes(abilityType)) {
-        return res.status(400).json({ error: 'Invalid abilityType' });
-      }
-      ship.abilityType = abilityType;
+      nextAbilityType = abilityType;
     }
+
+    const abilityError = validateAbilityForSize(nextAbilityType, nextSize);
+    if (abilityError) return res.status(400).json({ error: abilityError });
+    ship.abilityType = nextAbilityType;
 
     await ship.save();
     res.json(ship);

@@ -1,4 +1,4 @@
-import { getAbilityInfo } from '../../utils/abilityInfo.js'
+import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
 export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, isMyTurn, isTargeting, onCancelTarget }) {
   if (!fleet || fleet.length === 0) return null
@@ -6,7 +6,7 @@ export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, i
   const ship = fleet[selectedShipIndex] || fleet[0]
   if (!ship) return null
 
-  const ability = getAbilityInfo(ship.abilityType)
+  const ability = getAbilityInfo(ship.abilityType, ship.positions?.length || 1)
   const cooldownRemaining = ship.cooldownRemaining || 0
   const disabled = !isMyTurn || ship.isSunk || cooldownRemaining > 0 || isTargeting
 
@@ -29,7 +29,7 @@ export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, i
             <div style={{ color: '#e2e8f0', fontWeight: 700, fontSize: '0.92rem' }}>{ship.name || `Statek ${selectedShipIndex + 1}`}</div>
             <div style={{ color: '#94a3b8', fontSize: '0.76rem' }}>{ability.label}</div>
           </div>
-          <div style={{ color: '#fbbf24', fontSize: '0.78rem' }}>Bazowy CD: {ability.cooldown}</div>
+          <div style={{ color: '#fbbf24', fontSize: '0.78rem' }}>Bazowy CD: {formatCooldownTurns(ability.cooldown)}</div>
         </div>
 
         <div style={{ color: '#cbd5e1', fontSize: '0.8rem', lineHeight: 1.5, marginBottom: '8px' }}>
@@ -41,7 +41,7 @@ export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, i
 
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', alignItems: 'center' }}>
           <span style={{ color: cooldownRemaining > 0 ? '#f59e0b' : '#4ade80', fontSize: '0.76rem', fontWeight: 700 }}>
-            {ship.isSunk ? 'Statek zatopiony' : cooldownRemaining > 0 ? `Umiejętność gotowa za ${cooldownRemaining} tur` : 'Umiejętność gotowa'}
+            {ship.isSunk ? 'Statek zatopiony' : cooldownRemaining > 0 ? `Umiejętność gotowa za ${formatCooldownTurns(cooldownRemaining)}` : 'Umiejętność gotowa'}
           </span>
           <button
             onClick={() => !disabled && onUseAbility(selectedShipIndex)}
@@ -57,7 +57,7 @@ export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, i
               fontWeight: 700,
             }}
           >
-            {ship.abilityType === 'target' ? 'Wybierz cele' : 'Użyj umiejętności'}
+            {ship.abilityType === 'target' ? 'Wybierz cele' : ship.abilityType === 'linear' ? 'Wybierz linię' : 'Użyj umiejętności'}
           </button>
         </div>
       </div>
