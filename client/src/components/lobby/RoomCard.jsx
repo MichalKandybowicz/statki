@@ -1,9 +1,11 @@
-export default function RoomCard({ room, onJoin, currentUserId }) {
+export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom, currentUserId, deletingRoomId }) {
   const playerCount = room.players?.length || 0
   const isFull = playerCount >= 2
   const boardSize = room.settings?.boardSize || room.boardSize || 10
   const turnTimeLimit = room.settings?.turnTimeLimit || room.turnTimeLimit || 60
   const shipLimit = room.settings?.shipLimit || 5
+  const roomId = room._id || room.id
+  const hostEmail = room.hostId?.email || room.host?.email || room.hostEmail || 'Nieznany gospodarz'
 
   // Detect if current user is the host
   const hostId = room.hostId?._id || room.host?._id || room.host || room.hostId
@@ -15,13 +17,14 @@ export default function RoomCard({ room, onJoin, currentUserId }) {
   const hasPassword = room.hasPassword || !!room.password
   const statusColors = { waiting: '#22c55e', setup: '#38bdf8', in_game: '#f59e0b', finished: '#64748b' }
   const statusColor = statusColors[room.status] || '#94a3b8'
+  const isDeleting = deletingRoomId === roomId
 
   return (
     <div style={cardStyle}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <span style={{ color: '#e2e8f0', fontWeight: '600', fontSize: '0.95rem' }}>
-            {room.hostId?.email || room.host?.email || room.hostEmail || `Room ${(room._id || room.id || '').slice(-6)}`}
+            Lobby {(roomId || '').slice(-6)}
           </span>
           {hasPassword && (
             <span title="Password protected" style={{ fontSize: '0.85rem' }}>🔒</span>
@@ -30,6 +33,9 @@ export default function RoomCard({ room, onJoin, currentUserId }) {
             {room.status || 'waiting'}
           </span>
         </div>
+        <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '6px' }}>
+          Założyciel: <span style={{ color: '#e2e8f0' }}>{hostEmail}</span>
+        </div>
         <div style={{ display: 'flex', gap: '16px', color: '#64748b', fontSize: '0.8rem', flexWrap: 'wrap' }}>
           <span>Plansza {boardSize}×{boardSize}</span>
           <span>Players {playerCount}/2</span>
@@ -37,17 +43,41 @@ export default function RoomCard({ room, onJoin, currentUserId }) {
           <span>Statki {shipLimit}</span>
         </div>
       </div>
-      <button
-        onClick={() => onJoin(room)}
-        disabled={isFull || isHost || room.status === 'in_game'}
-        style={{
-          ...joinBtnStyle,
-          opacity: (isFull || isHost || room.status === 'in_game') ? 0.45 : 1,
-          cursor: (isFull || isHost || room.status === 'in_game') ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {isHost ? 'Twój pokój' : isFull ? 'Pełny' : room.status === 'in_game' ? 'W grze' : 'Dołącz'}
-      </button>
+      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+        {isHost ? (
+          <>
+            <button
+              onClick={() => onOpenOwnRoom?.(room)}
+              style={joinBtnStyle}
+            >
+              Otwórz
+            </button>
+            <button
+              onClick={() => onDeleteOwnRoom?.(room)}
+              disabled={isDeleting}
+              style={{
+                ...deleteBtnStyle,
+                opacity: isDeleting ? 0.55 : 1,
+                cursor: isDeleting ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isDeleting ? 'Zamykanie…' : 'Zamknij lobby'}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => onJoin(room)}
+            disabled={isFull || room.status === 'in_game'}
+            style={{
+              ...joinBtnStyle,
+              opacity: (isFull || room.status === 'in_game') ? 0.45 : 1,
+              cursor: (isFull || room.status === 'in_game') ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {isFull ? 'Pełny' : room.status === 'in_game' ? 'W grze' : 'Dołącz'}
+          </button>
+        )}
+      </div>
     </div>
   )
 }
@@ -73,3 +103,14 @@ const joinBtnStyle = {
   flexShrink: 0,
   cursor: 'pointer',
 }
+
+const deleteBtnStyle = {
+  background: 'rgba(239,68,68,0.12)',
+  color: '#fca5a5',
+  border: '1px solid rgba(239,68,68,0.25)',
+  borderRadius: '7px',
+  padding: '8px 14px',
+  fontSize: '0.82rem',
+  fontWeight: '600',
+}
+

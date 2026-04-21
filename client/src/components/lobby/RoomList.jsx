@@ -1,6 +1,6 @@
 import RoomCard from './RoomCard.jsx'
 
-export default function RoomList({ rooms, onJoin, currentUserId }) {
+export default function RoomList({ rooms, onJoin, onOpenOwnRoom, onDeleteOwnRoom, currentUserId, deletingRoomId }) {
   if (!rooms || rooms.length === 0) {
     return (
       <div style={{
@@ -21,7 +21,10 @@ export default function RoomList({ rooms, onJoin, currentUserId }) {
           key={room._id || room.id}
           room={room}
           onJoin={onJoin}
+          onOpenOwnRoom={onOpenOwnRoom}
+          onDeleteOwnRoom={onDeleteOwnRoom}
           currentUserId={currentUserId}
+          deletingRoomId={deletingRoomId}
         />
       ))}
     </div>
