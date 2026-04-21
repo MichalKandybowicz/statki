@@ -29,7 +29,7 @@ function tileColor(tile) {
   }
 }
 
-export default function FleetPlacer({ boardSize, boardTiles, availableShips, onFleetReady }) {
+export default function FleetPlacer({ boardSize, boardTiles, availableShips, shipLimit = 5, onFleetReady }) {
   // Base board (rocks from template, no ships)
   const [baseTiles, setBaseTiles] = useState(() => boardTiles?.map(r => [...r]) || [])
   const [placedShips, setPlacedShips] = useState([])
@@ -67,6 +67,7 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, onF
 
   function placeShip(row, col) {
     if (!selectedShip) return
+    if (placedShips.length >= shipLimit) return
     const shape = applyRotations(selectedShip.shape, rotation)
     const cells = getShipCells(shape).map(({ r: dr, c: dc }) => ({ r: row + dr, c: col + dc }))
     if (!canPlaceShip(currentBoard, cells, boardSize)) return
@@ -163,7 +164,7 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, onF
           <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
             {selectedShip
               ? `Układasz statek (obrót: ${rotation * 90}°) — przeciągnij lub kliknij planszę`
-              : 'Wybierz statek z listy lub przeciągnij na planszę; kliknij statek żeby go usunąć'}
+              : `Wybierz statek z listy lub przeciągnij na planszę; kliknij statek żeby go usunąć. Limit: ${shipLimit}`}
           </span>
         </div>
 
@@ -203,8 +204,8 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, onF
         </div>
 
         <div style={{ marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{placedShips.length} statek/statków ustawionych</span>
-          {placedShips.length > 0 && !selectedShip && (
+          <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{placedShips.length}/{shipLimit} statek/statków ustawionych</span>
+          {placedShips.length === shipLimit && !selectedShip && (
             <button onClick={handleReady} style={readyBtnStyle}>✓ Gotowy!</button>
           )}
         </div>

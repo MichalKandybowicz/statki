@@ -3,6 +3,7 @@ import { boards as boardsApi } from '../../services/api'
 
 export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   const [turnTimeLimit, setTurnTimeLimit] = useState(60)
+  const [shipLimit, setShipLimit] = useState(5)
   const [password, setPassword] = useState('')
   const [boardTemplateId, setBoardTemplateId] = useState('')
   const [availableBoards, setAvailableBoards] = useState([])
@@ -24,6 +25,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     const data = {
       boardSize: selectedBoard?.size || 10,
       turnTimeLimit,
+      shipLimit,
       boardTemplateId,
     }
     if (password) data.password = password
@@ -88,6 +90,18 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
                 style={{ width: '100%', accentColor: '#2563eb' }}
               />
               <div style={rangeHintsStyle}><span>10s</span><span>5min</span></div>
+            </div>
+
+            <div style={fieldStyle}>
+              <label style={labelStyle}>
+                Limit statków: <strong style={{ color: '#60a5fa' }}>{shipLimit}</strong>
+              </label>
+              <input
+                type="range" min="1" max="10" step="1" value={shipLimit}
+                onChange={e => setShipLimit(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#2563eb' }}
+              />
+              <div style={rangeHintsStyle}><span>1</span><span>10</span></div>
             </div>
 
             {/* Password */}

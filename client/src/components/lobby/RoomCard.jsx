@@ -1,15 +1,19 @@
 export default function RoomCard({ room, onJoin, currentUserId }) {
   const playerCount = room.players?.length || 0
   const isFull = playerCount >= 2
+  const boardSize = room.settings?.boardSize || room.boardSize || 10
+  const turnTimeLimit = room.settings?.turnTimeLimit || room.turnTimeLimit || 60
+  const shipLimit = room.settings?.shipLimit || 5
 
   // Detect if current user is the host
-  const hostId = room.host?._id || room.host || room.hostId
+  const hostId = room.hostId?._id || room.host?._id || room.host || room.hostId
   const isHost = hostId === currentUserId ||
+    room.players?.[0]?.userId?._id === currentUserId ||
     room.players?.[0]?._id === currentUserId ||
     room.players?.[0] === currentUserId
 
   const hasPassword = room.hasPassword || !!room.password
-  const statusColors = { waiting: '#22c55e', playing: '#f59e0b', finished: '#64748b' }
+  const statusColors = { waiting: '#22c55e', setup: '#38bdf8', in_game: '#f59e0b', finished: '#64748b' }
   const statusColor = statusColors[room.status] || '#94a3b8'
 
   return (
@@ -17,7 +21,7 @@ export default function RoomCard({ room, onJoin, currentUserId }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
           <span style={{ color: '#e2e8f0', fontWeight: '600', fontSize: '0.95rem' }}>
-            {room.host?.email || room.hostEmail || `Room ${(room._id || room.id || '').slice(-6)}`}
+            {room.hostId?.email || room.host?.email || room.hostEmail || `Room ${(room._id || room.id || '').slice(-6)}`}
           </span>
           {hasPassword && (
             <span title="Password protected" style={{ fontSize: '0.85rem' }}>🔒</span>
@@ -27,21 +31,22 @@ export default function RoomCard({ room, onJoin, currentUserId }) {
           </span>
         </div>
         <div style={{ display: 'flex', gap: '16px', color: '#64748b', fontSize: '0.8rem', flexWrap: 'wrap' }}>
-          <span>Board {room.boardSize}×{room.boardSize}</span>
+          <span>Plansza {boardSize}×{boardSize}</span>
           <span>Players {playerCount}/2</span>
-          <span>Turn {room.turnTimeLimit}s</span>
+          <span>Tura {turnTimeLimit}s</span>
+          <span>Statki {shipLimit}</span>
         </div>
       </div>
       <button
         onClick={() => onJoin(room)}
-        disabled={isFull || isHost || room.status === 'playing'}
+        disabled={isFull || isHost || room.status === 'in_game'}
         style={{
           ...joinBtnStyle,
-          opacity: (isFull || isHost || room.status === 'playing') ? 0.45 : 1,
-          cursor: (isFull || isHost || room.status === 'playing') ? 'not-allowed' : 'pointer',
+          opacity: (isFull || isHost || room.status === 'in_game') ? 0.45 : 1,
+          cursor: (isFull || isHost || room.status === 'in_game') ? 'not-allowed' : 'pointer',
         }}
       >
-        {isHost ? 'Your Room' : isFull ? 'Full' : room.status === 'playing' ? 'In Progress' : 'Join'}
+        {isHost ? 'Twój pokój' : isFull ? 'Pełny' : room.status === 'in_game' ? 'W grze' : 'Dołącz'}
       </button>
     </div>
   )

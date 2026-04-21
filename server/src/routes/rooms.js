@@ -1,6 +1,8 @@
 const express = require('express');
 const Room = require('../models/Room');
+const BoardTemplate = require('../models/BoardTemplate');
 const { authMiddleware } = require('../middleware/auth');
+const { ensureUniqueRoomPlayers } = require('../utils/roomPlayers');
 
 const router = express.Router();
 router.use(authMiddleware);
@@ -11,13 +13,16 @@ router.get('/', async (req, res) => {
     const rooms = await Room.find({ status: 'waiting' })
       .select('-settings.password')
       .populate('hostId', 'email')
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort({ createdAt: -1 });
+
+    for (const room of rooms) {
+      await ensureUniqueRoomPlayers(room);
+    }
 
     const sanitized = rooms.map((r) => ({
-      ...r,
+      ...r.toObject(),
       hasPassword: !!(r.settings && r.settings.password),
-      settings: { ...r.settings, password: undefined },
+      settings: { ...r.settings.toObject(), password: undefined },
     }));
 
     res.json(sanitized);
@@ -30,35 +35,45 @@ router.get('/', async (req, res) => {
 // POST /api/rooms - create room
 router.post('/', async (req, res) => {
   try {
-    const { boardSize = 10, turnTimeLimit = 60, password, boardTemplateId } = req.body;
+    const { turnTimeLimit = 60, shipLimit = 5, password, boardTemplateId } = req.body;
 
-    if (boardSize < 10 || boardSize > 25) {
-      return res.status(400).json({ error: 'boardSize must be between 10 and 25' });
+    if (!boardTemplateId) {
+      return res.status(400).json({ error: 'boardTemplateId is required' });
     }
     if (turnTimeLimit < 10 || turnTimeLimit > 300) {
       return res.status(400).json({ error: 'turnTimeLimit must be between 10 and 300 seconds' });
+    }
+    if (shipLimit < 1 || shipLimit > 10) {
+      return res.status(400).json({ error: 'shipLimit must be between 1 and 10' });
+    }
+
+    const boardTemplate = await BoardTemplate.findOne({ _id: boardTemplateId, ownerId: req.user._id }).lean();
+    if (!boardTemplate) {
+      return res.status(404).json({ error: 'Board template not found' });
     }
 
     const room = new Room({
       hostId: req.user._id,
       players: [{ userId: req.user._id, ready: false }],
       settings: {
-        boardSize,
+        boardSize: boardTemplate.size,
         turnTimeLimit,
+        shipLimit,
         password: password || null,
-        boardTemplateId: boardTemplateId || null,
+        boardTemplateId,
       },
     });
     await room.save();
 
     const populated = await Room.findById(room._id)
-      .populate('hostId', 'email')
-      .lean();
+      .populate('hostId', 'email');
+
+    await ensureUniqueRoomPlayers(populated);
 
     res.status(201).json({
-      ...populated,
+      ...populated.toObject(),
       hasPassword: !!populated.settings.password,
-      settings: { ...populated.settings, password: undefined },
+      settings: { ...populated.settings.toObject(), password: undefined },
     });
   } catch (err) {
     console.error('Create room error:', err);
@@ -71,19 +86,21 @@ router.get('/:id', async (req, res) => {
   try {
     const room = await Room.findById(req.params.id)
       .populate('hostId', 'email')
-      .populate('players.userId', 'email')
-      .lean();
+      .populate('players.userId', 'email');
 
     if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    await ensureUniqueRoomPlayers(room);
+    await room.populate('players.userId', 'email');
 
     const isPlayer = room.players.some(
       (p) => p.userId && p.userId._id.toString() === req.user._id.toString()
     );
 
     res.json({
-      ...room,
+      ...room.toObject(),
       hasPassword: !!room.settings.password,
-      settings: { ...room.settings, password: isPlayer ? room.settings.password : undefined },
+      settings: { ...room.settings.toObject(), password: isPlayer ? room.settings.password : undefined },
     });
   } catch (err) {
     console.error('Get room error:', err);
@@ -98,6 +115,7 @@ router.post('/:id/join', async (req, res) => {
     const room = await Room.findById(req.params.id);
 
     if (!room) return res.status(404).json({ error: 'Room not found' });
+    await ensureUniqueRoomPlayers(room);
     if (room.status !== 'waiting') {
       return res.status(400).json({ error: 'Room is not accepting players' });
     }
@@ -122,13 +140,14 @@ router.post('/:id/join', async (req, res) => {
 
     const populated = await Room.findById(room._id)
       .populate('hostId', 'email')
-      .populate('players.userId', 'email')
-      .lean();
+      .populate('players.userId', 'email');
+
+    await ensureUniqueRoomPlayers(populated);
 
     res.json({
-      ...populated,
+      ...populated.toObject(),
       hasPassword: !!populated.settings.password,
-      settings: { ...populated.settings, password: undefined },
+      settings: { ...populated.settings.toObject(), password: undefined },
     });
   } catch (err) {
     console.error('Join room error:', err);

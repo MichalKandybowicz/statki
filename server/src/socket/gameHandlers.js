@@ -2,81 +2,125 @@ const Room = require('../models/Room');
 const Game = require('../models/Game');
 const BoardTemplate = require('../models/BoardTemplate');
 const ShipTemplate = require('../models/ShipTemplate');
-const { initGame, processMove, checkWinCondition, getPlayerView, switchTurn } = require('../engine/gameEngine');
+const { initGame, processMove, checkWinCondition, getPlayerView } = require('../engine/gameEngine');
 const { useLinearShot, useRandomShot, useTargetShot, useSonar, tickCooldowns } = require('../engine/abilityEngine');
-const { startTurn, endTurn, checkSkips, isTurnTimedOut } = require('../engine/turnEngine');
+const { endTurn, checkSkips } = require('../engine/turnEngine');
 const { validatePlacement } = require('../utils/shipPlacement');
 const { emitToUser } = require('./socketUtils');
+const { ensureUniqueRoomPlayers, getPlayerUserId } = require('../utils/roomPlayers');
 
 // Per-game fleet staging: Map<roomId, Map<userId, fleet>>
 const stagedFleets = new Map();
 
-function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
-  const userId = socket.user._id.toString();
+function clearTurnTimer(turnTimers, gameId) {
+  const existing = turnTimers.get(gameId.toString());
+  if (existing) {
+    clearTimeout(existing);
+    turnTimers.delete(gameId.toString());
+  }
+}
 
-  /**
-   * Starts a turn timer for the current player.
-   */
-  function scheduleTurnTimer(game, room) {
-    const gameId = game._id.toString();
-    clearTurnTimer(gameId);
+function scheduleTurnTimer(io, connectedUsers, turnTimers, game, room) {
+  const gameId = game._id.toString();
+  clearTurnTimer(turnTimers, gameId);
 
-    const timeLimit = (room?.settings?.turnTimeLimit || 60) * 1000;
-    const timer = setTimeout(async () => {
-      try {
-        const freshGame = await Game.findById(gameId);
-        if (!freshGame || freshGame.status !== 'in_game') return;
+  const timeLimit = (room?.settings?.turnTimeLimit || 60) * 1000;
+  const timer = setTimeout(async () => {
+    try {
+      const freshGame = await Game.findById(gameId);
+      if (!freshGame || freshGame.status !== 'in_game') return;
 
-        const currentPlayerId = freshGame.turn.toString();
-        const { skips, lost } = checkSkips(freshGame, currentPlayerId);
+      const currentPlayerId = freshGame.turn.toString();
+      const { lost } = checkSkips(freshGame, currentPlayerId);
 
-        if (lost) {
-          const winnerId = freshGame.players.find((p) => p.toString() !== currentPlayerId);
-          freshGame.status = 'finished';
-          freshGame.winnerId = winnerId;
-          await freshGame.save();
-
-          await Room.findByIdAndUpdate(freshGame.roomId, { status: 'finished' });
-
-          for (const pid of freshGame.players) {
-            emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
-              winnerId: winnerId ? winnerId.toString() : null,
-            });
-          }
-          return;
-        }
-
-        const nextPlayerId = endTurn(freshGame, currentPlayerId);
-        tickCooldowns(freshGame, nextPlayerId);
+      if (lost) {
+        const winnerId = freshGame.players.find((p) => p.toString() !== currentPlayerId);
+        freshGame.status = 'finished';
+        freshGame.winnerId = winnerId;
         await freshGame.save();
 
-        const freshRoom = await Room.findById(freshGame.roomId);
+        await Room.findByIdAndUpdate(freshGame.roomId, { status: 'finished' });
 
         for (const pid of freshGame.players) {
-          const pidStr = pid.toString();
-          emitToUser(io, connectedUsers, pidStr, 'turn_update', {
-            turn: nextPlayerId,
-            turnStartedAt: freshGame.turnStartedAt,
-            skips: Object.fromEntries(freshGame.skips),
+          emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
+            winnerId: winnerId ? winnerId.toString() : null,
           });
         }
-
-        scheduleTurnTimer(freshGame, freshRoom);
-      } catch (err) {
-        console.error('Turn timer error:', err);
+        return;
       }
-    }, timeLimit);
 
-    turnTimers.set(gameId, timer);
-  }
+      const nextPlayerId = endTurn(freshGame, currentPlayerId);
+      tickCooldowns(freshGame, nextPlayerId);
+      await freshGame.save();
 
-  function clearTurnTimer(gameId) {
-    const existing = turnTimers.get(gameId.toString());
-    if (existing) {
-      clearTimeout(existing);
-      turnTimers.delete(gameId.toString());
+      const freshRoom = await Room.findById(freshGame.roomId);
+
+      for (const pid of freshGame.players) {
+        const pidStr = pid.toString();
+        emitToUser(io, connectedUsers, pidStr, 'turn_update', {
+          turn: nextPlayerId,
+          turnStartedAt: freshGame.turnStartedAt,
+          skips: Object.fromEntries(freshGame.skips),
+        });
+      }
+
+      scheduleTurnTimer(io, connectedUsers, turnTimers, freshGame, freshRoom);
+    } catch (err) {
+      console.error('Turn timer error:', err);
     }
+  }, timeLimit);
+
+  turnTimers.set(gameId, timer);
+}
+
+async function startGameForRoom(io, room, connectedUsers, turnTimers) {
+  const roomId = room._id.toString();
+  const roomFleets = stagedFleets.get(roomId);
+
+  if (!roomFleets) {
+    return { started: false, message: 'No staged fleets found for this room' };
   }
+
+  const allSubmitted = room.players.every((p) => roomFleets.has(p.userId.toString()));
+  if (!allSubmitted) {
+    return { started: false, message: 'All players must submit fleets before starting' };
+  }
+
+  let templateTiles = null;
+  if (room.settings.boardTemplateId) {
+    const tmpl = await BoardTemplate.findById(room.settings.boardTemplateId);
+    if (tmpl) templateTiles = tmpl.tiles;
+  }
+
+  const playerFleets = new Map(roomFleets);
+  stagedFleets.delete(roomId);
+
+  const game = await initGame(room, playerFleets, templateTiles);
+
+  room.status = 'in_game';
+  room.gameId = game._id;
+  await room.save();
+
+  for (const player of room.players) {
+    const pid = player.userId.toString();
+    const playerView = getPlayerView(game, pid);
+    emitToUser(io, connectedUsers, pid, 'game_start', {
+      gameId: game._id.toString(),
+      boardSize: game.boardSize,
+      boards: playerView,
+      turn: game.turn.toString(),
+      turnStartedAt: game.turnStartedAt,
+      players: game.players.map((p) => p.toString()),
+    });
+  }
+
+  scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
+
+  return { started: true, game };
+}
+
+function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
+  const userId = socket.user._id.toString();
 
   // place_fleet: player submits their fleet placement during setup
   socket.on('place_fleet', async ({ roomId, fleet } = {}) => {
@@ -87,12 +131,18 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
 
       const room = await Room.findById(roomId);
       if (!room) return socket.emit('error', { message: 'Room not found' });
+      await ensureUniqueRoomPlayers(room);
 
-      const isPlayer = room.players.some((p) => p.userId.toString() === userId);
+      const isPlayer = room.players.some((p) => getPlayerUserId(p) === userId);
       if (!isPlayer) return socket.emit('error', { message: 'Not in this room' });
 
       if (room.status !== 'setup' && room.status !== 'waiting') {
         return socket.emit('error', { message: 'Room is not in setup phase' });
+      }
+      if (fleet.length !== (room.settings.shipLimit || 5)) {
+        return socket.emit('error', {
+          message: `You must place exactly ${room.settings.shipLimit || 5} ships`,
+        });
       }
 
       // Resolve ship templates and validate
@@ -137,40 +187,21 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       // Move room to setup if still waiting
       if (room.status === 'waiting') {
         room.status = 'setup';
-        await room.save();
       }
+      const player = room.players.find((p) => getPlayerUserId(p) === userId);
+      if (player) player.ready = true;
+      await room.save();
+
+      await room.populate('hostId', 'email');
+      await room.populate('players.userId', 'email');
 
       socket.emit('fleet_accepted', { message: 'Fleet placement accepted' });
 
-      // Check if all players have submitted fleets
-      const roomFleets = stagedFleets.get(roomId);
-      const allSubmitted = room.players.every((p) => roomFleets.has(p.userId.toString()));
-
-      if (allSubmitted && room.players.length === 2) {
-        const playerFleets = new Map(roomFleets);
-        stagedFleets.delete(roomId);
-
-        const game = await initGame(room, playerFleets, templateTiles);
-
-        room.status = 'in_game';
-        room.gameId = game._id;
-        await room.save();
-
-        for (const player of room.players) {
-          const pid = player.userId.toString();
-          const playerView = getPlayerView(game, pid);
-          emitToUser(io, connectedUsers, pid, 'game_start', {
-            gameId: game._id.toString(),
-            boardSize: game.boardSize,
-            boards: playerView,
-            turn: game.turn.toString(),
-            turnStartedAt: game.turnStartedAt,
-            players: game.players.map((p) => p.toString()),
-          });
-        }
-
-        scheduleTurnTimer(game, room);
-      }
+      io.to(`room:${roomId}`).emit('room_update', {
+        ...room.toObject(),
+        hasPassword: !!room.settings.password,
+        settings: { ...room.settings.toObject(), password: undefined },
+      });
     } catch (err) {
       console.error('place_fleet error:', err);
       socket.emit('error', { message: 'Failed to place fleet' });
@@ -208,7 +239,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         await game.save();
 
         await Room.findByIdAndUpdate(game.roomId, { status: 'finished' });
-        clearTurnTimer(gameId);
+        clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {
           emitToUser(io, connectedUsers, pid.toString(), 'move_result', {
@@ -246,8 +277,8 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           });
         }
 
-        clearTurnTimer(gameId);
-        scheduleTurnTimer(game, room);
+        clearTurnTimer(turnTimers, gameId);
+        scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
       } else {
         // Hit: same player continues — reset turn timer start time
         game.lastActionAt = new Date();
@@ -268,8 +299,8 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
 
         // Reset turn timer (player gets full time for next shot)
         const room = await Room.findById(game.roomId);
-        clearTurnTimer(gameId);
-        scheduleTurnTimer(game, room);
+        clearTurnTimer(turnTimers, gameId);
+        scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
       }
     } catch (err) {
       console.error('make_move error:', err);
@@ -313,11 +344,11 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           const sonarResult = useSonar(game, userId, shipIndex);
           await game.save();
           const room = await Room.findById(game.roomId);
-          clearTurnTimer(gameId);
+          clearTurnTimer(turnTimers, gameId);
           const nextPlayerId = endTurn(game, userId);
           tickCooldowns(game, nextPlayerId);
           await game.save();
-          scheduleTurnTimer(game, room);
+          scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
 
           socket.emit('sonar_result', sonarResult);
           for (const pid of game.players) {
@@ -344,7 +375,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         game.winnerId = winnerId;
         await game.save();
         await Room.findByIdAndUpdate(game.roomId, { status: 'finished' });
-        clearTurnTimer(gameId);
+        clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {
           emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
@@ -358,11 +389,11 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       }
 
       const room = await Room.findById(game.roomId);
-      clearTurnTimer(gameId);
+      clearTurnTimer(turnTimers, gameId);
       const nextPlayerId = endTurn(game, userId);
       tickCooldowns(game, nextPlayerId);
       await game.save();
-      scheduleTurnTimer(game, room);
+      scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
 
       for (const pid of game.players) {
         emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
@@ -413,4 +444,4 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
   });
 }
 
-module.exports = { registerGameHandlers };
+module.exports = { registerGameHandlers, startGameForRoom };

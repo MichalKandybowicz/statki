@@ -34,6 +34,18 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/boards/:id
+router.get('/:id', async (req, res) => {
+  try {
+    const board = await BoardTemplate.findById(req.params.id).lean();
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+    res.json(board);
+  } catch (err) {
+    console.error('Get board error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/boards
 router.post('/', async (req, res) => {
   try {

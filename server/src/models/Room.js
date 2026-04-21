@@ -15,6 +15,7 @@ const roomSchema = new mongoose.Schema({
   settings: {
     boardSize: { type: Number, default: 10, min: 10, max: 25 },
     turnTimeLimit: { type: Number, default: 60 },
+    shipLimit: { type: Number, default: 5, min: 1, max: 10 },
     password: { type: String, default: null },
     boardTemplateId: { type: mongoose.Schema.Types.ObjectId, ref: 'BoardTemplate', default: null },
   },
