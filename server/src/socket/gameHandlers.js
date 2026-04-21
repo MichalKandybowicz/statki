@@ -314,11 +314,12 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         clearTurnTimer(turnTimers, gameId);
         scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
       } else {
-        // Hit: same player continues — reset turn timer start time
-        game.lastActionAt = new Date();
-        game.turnStartedAt = new Date();
-        game.markModified('turnStartedAt');
+        // Hit: switch turn (1 shot per turn regardless of hit or miss)
+        const nextPlayerId = endTurn(game, userId);
+        tickCooldowns(game, nextPlayerId);
         await game.save();
+
+        const room = await Room.findById(game.roomId);
 
         for (const pid of game.players) {
           const pidStr = pid.toString();
@@ -335,8 +336,8 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           });
         }
 
-        // Reset turn timer (player gets full time for next shot)
-        const room = await Room.findById(game.roomId);
+        emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
+
         clearTurnTimer(turnTimers, gameId);
         scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
       }
