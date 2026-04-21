@@ -6,6 +6,12 @@ const shipTemplateSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  name: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: 40,
+  },
   shape: {
     type: [[Number]],
     required: true,

@@ -1,7 +1,9 @@
 import ShipGrid from './ShipGrid.jsx'
+import { getAbilityInfo } from '../../utils/abilityInfo.js'
 
 export default function ShipCard({ ship, onDelete, onEdit }) {
   const cellCount = ship.shape?.flat().filter(v => v === 1).length || 0
+  const ability = getAbilityInfo(ship.abilityType)
 
   return (
     <div style={cardStyle}>
@@ -9,18 +11,22 @@ export default function ShipCard({ ship, onDelete, onEdit }) {
         <ShipGrid shape={ship.shape} readOnly />
       </div>
       <div style={{ flex: 1, minWidth: 0, paddingLeft: '12px' }}>
-        <div style={{ color: '#e2e8f0', fontWeight: '600', fontSize: '0.9rem', marginBottom: '3px' }}>
-          {cellCount} cell{cellCount !== 1 ? 's' : ''}
+        <div style={{ color: '#e2e8f0', fontWeight: '700', fontSize: '0.95rem', marginBottom: '4px' }}>
+          {ship.name || 'Nienazwany statek'}
         </div>
-        <div style={{ color: '#64748b', fontSize: '0.78rem' }}>
-          Ability: <span style={{ color: '#94a3b8' }}>{ship.abilityType || '—'}</span>
+        <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '4px' }}>
+          {cellCount} pól · {ability.label}
+        </div>
+        <div style={{ color: '#fbbf24', fontSize: '0.74rem', marginBottom: '4px' }}>Cooldown: {ability.cooldown} tury</div>
+        <div style={{ color: '#64748b', fontSize: '0.74rem', lineHeight: 1.45 }}>
+          {ability.description}
         </div>
       </div>
       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
         {onEdit && (
-          <button onClick={() => onEdit(ship)} style={editBtnStyle}>Edit</button>
+          <button onClick={() => onEdit(ship)} style={editBtnStyle}>Edytuj</button>
         )}
-        <button onClick={() => onDelete(ship._id || ship.id)} style={deleteBtnStyle}>Delete</button>
+        <button onClick={() => onDelete(ship._id || ship.id)} style={deleteBtnStyle}>Usuń</button>
       </div>
     </div>
   )

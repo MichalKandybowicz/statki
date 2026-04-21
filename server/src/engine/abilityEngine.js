@@ -5,6 +5,7 @@
  */
 
 const { processMove } = require('./gameEngine');
+const { getAbilityCooldown } = require('./abilityConfig');
 
 /**
  * Validates that a ship exists, belongs to the player, and is not sunk.
@@ -51,7 +52,7 @@ function useLinearShot(game, playerId, shipIndex) {
     results.push({ x, y: row, hit: result.hit, sunk: result.sunk, alreadyShot: false });
   }
 
-  applyCooldown(fleet, shipIndex, 2);
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('linear'));
   game.fleets.set(playerId.toString(), fleet);
   game.markModified('fleets');
 
@@ -88,7 +89,7 @@ function useRandomShot(game, playerId, shipIndex) {
   const target = unshot[Math.floor(Math.random() * unshot.length)];
   const result = processMove(game, playerId, target.x, target.y);
 
-  applyCooldown(fleet, shipIndex, 1);
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('random'));
   game.fleets.set(playerId.toString(), fleet);
   game.markModified('fleets');
 
@@ -122,7 +123,7 @@ function useTargetShot(game, playerId, shipIndex, targets) {
     }
   }
 
-  applyCooldown(fleet, shipIndex, 2);
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('target'));
   game.fleets.set(playerId.toString(), fleet);
   game.markModified('fleets');
 
@@ -165,7 +166,7 @@ function useSonar(game, playerId, shipIndex) {
     }
   }
 
-  applyCooldown(fleet, shipIndex, 3);
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('sonar'));
   game.fleets.set(playerId.toString(), fleet);
   game.markModified('fleets');
 

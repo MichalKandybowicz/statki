@@ -27,6 +27,16 @@ function validateShape(shape) {
   return null;
 }
 
+function validateName(name) {
+  if (typeof name !== 'string' || !name.trim()) {
+    return 'Ship name is required';
+  }
+  if (name.trim().length > 40) {
+    return 'Ship name must be at most 40 characters';
+  }
+  return null;
+}
+
 // GET /api/ships
 router.get('/', async (req, res) => {
   try {
@@ -41,7 +51,10 @@ router.get('/', async (req, res) => {
 // POST /api/ships
 router.post('/', async (req, res) => {
   try {
-    const { shape, abilityType } = req.body;
+    const { name, shape, abilityType } = req.body;
+
+    const nameError = validateName(name);
+    if (nameError) return res.status(400).json({ error: nameError });
 
     const shapeError = validateShape(shape);
     if (shapeError) return res.status(400).json({ error: shapeError });
@@ -52,7 +65,7 @@ router.post('/', async (req, res) => {
     }
 
     const size = countCells(shape);
-    const ship = new ShipTemplate({ ownerId: req.user._id, shape, size, abilityType });
+    const ship = new ShipTemplate({ ownerId: req.user._id, name: name.trim(), shape, size, abilityType });
     await ship.save();
 
     res.status(201).json(ship);
@@ -68,7 +81,13 @@ router.put('/:id', async (req, res) => {
     const ship = await ShipTemplate.findOne({ _id: req.params.id, ownerId: req.user._id });
     if (!ship) return res.status(404).json({ error: 'Ship not found' });
 
-    const { shape, abilityType } = req.body;
+    const { name, shape, abilityType } = req.body;
+
+    if (name !== undefined) {
+      const nameError = validateName(name);
+      if (nameError) return res.status(400).json({ error: nameError });
+      ship.name = name.trim();
+    }
 
     if (shape !== undefined) {
       const shapeError = validateShape(shape);

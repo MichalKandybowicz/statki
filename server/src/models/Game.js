@@ -8,6 +8,8 @@ const positionSchema = new mongoose.Schema(
 const shipStateSchema = new mongoose.Schema(
   {
     shipTemplateId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShipTemplate' },
+    name: { type: String, default: 'Statek' },
+    abilityType: { type: String, default: null },
     positions: [positionSchema],
     hits: [positionSchema],
     isSunk: { type: Boolean, default: false },
@@ -32,6 +34,7 @@ const gameSchema = new mongoose.Schema({
   },
   players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   boardSize: { type: Number, required: true },
+  turnTimeLimit: { type: Number, default: 60 },
   boards: {
     type: Map,
     of: boardStateSchema,

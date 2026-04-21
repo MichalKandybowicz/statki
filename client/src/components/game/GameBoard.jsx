@@ -9,7 +9,7 @@ function getTileColor(tile, isOwnBoard) {
   }
 }
 
-export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, sonarPositions }) {
+export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, sonarPositions, targetPositions }) {
   if (!tiles || !boardSize) return <div style={{ color: '#64748b', padding: '20px' }}>Loading board…</div>
 
   const tileSize = Math.max(18, Math.min(38, Math.floor(480 / boardSize)))
@@ -32,8 +32,9 @@ export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, s
             </div>
             {row.map((tile, c) => {
               const isSonar = sonarPositions?.some(p => p.x === c && p.y === r)
+              const isTargeted = targetPositions?.some(p => p.x === c && p.y === r)
               const displayTile = (!isOwnBoard && tile === 'ship') ? 'water' : tile
-              const bg = isSonar ? '#14532d' : getTileColor(displayTile, isOwnBoard)
+              const bg = isSonar ? '#14532d' : isTargeted ? '#7c2d12' : getTileColor(displayTile, isOwnBoard)
               const canClick = !isOwnBoard && (displayTile === 'water' || displayTile === 'rock')
               return (
                 <div
@@ -43,7 +44,7 @@ export default function GameBoard({ tiles, isOwnBoard, onTileClick, boardSize, s
                     width: `${tileSize}px`,
                     height: `${tileSize}px`,
                     background: bg,
-                    border: isSonar ? '1px solid #22c55e' : '1px solid rgba(255,255,255,0.05)',
+                    border: isSonar ? '1px solid #22c55e' : isTargeted ? '1px solid #fb923c' : '1px solid rgba(255,255,255,0.05)',
                     cursor: canClick ? 'crosshair' : 'default',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     boxSizing: 'border-box',

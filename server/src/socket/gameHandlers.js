@@ -12,6 +12,34 @@ const { ensureUniqueRoomPlayers, getPlayerUserId } = require('../utils/roomPlaye
 // Per-game fleet staging: Map<roomId, Map<userId, fleet>>
 const stagedFleets = new Map();
 
+function getPlayerGamePayload(game, playerId) {
+  return {
+    gameId: game._id.toString(),
+    boardSize: game.boardSize,
+    turnTimeLimit: game.turnTimeLimit || 60,
+    boards: getPlayerView(game, playerId),
+    turn: game.turn ? game.turn.toString() : null,
+    turnStartedAt: game.turnStartedAt,
+    status: game.status,
+    winnerId: game.winnerId ? game.winnerId.toString() : null,
+    skips: Object.fromEntries(game.skips || []),
+    players: game.players.map((p) => p.toString()),
+    fleet: game.fleets.get(playerId.toString()) || [],
+  };
+}
+
+function emitTurnUpdateToPlayers(io, connectedUsers, game, turnPlayerId) {
+  for (const pid of game.players) {
+    const pidStr = pid.toString();
+    emitToUser(io, connectedUsers, pidStr, 'turn_update', {
+      turn: turnPlayerId,
+      turnStartedAt: game.turnStartedAt,
+      skips: Object.fromEntries(game.skips || []),
+      fleet: game.fleets.get(pidStr) || [],
+    });
+  }
+}
+
 function clearTurnTimer(turnTimers, gameId) {
   const existing = turnTimers.get(gameId.toString());
   if (existing) {
@@ -55,14 +83,7 @@ function scheduleTurnTimer(io, connectedUsers, turnTimers, game, room) {
 
       const freshRoom = await Room.findById(freshGame.roomId);
 
-      for (const pid of freshGame.players) {
-        const pidStr = pid.toString();
-        emitToUser(io, connectedUsers, pidStr, 'turn_update', {
-          turn: nextPlayerId,
-          turnStartedAt: freshGame.turnStartedAt,
-          skips: Object.fromEntries(freshGame.skips),
-        });
-      }
+      emitTurnUpdateToPlayers(io, connectedUsers, freshGame, nextPlayerId);
 
       scheduleTurnTimer(io, connectedUsers, turnTimers, freshGame, freshRoom);
     } catch (err) {
@@ -81,7 +102,7 @@ async function startGameForRoom(io, room, connectedUsers, turnTimers) {
     return { started: false, message: 'No staged fleets found for this room' };
   }
 
-  const allSubmitted = room.players.every((p) => roomFleets.has(p.userId.toString()));
+  const allSubmitted = room.players.every((p) => roomFleets.has(getPlayerUserId(p)));
   if (!allSubmitted) {
     return { started: false, message: 'All players must submit fleets before starting' };
   }
@@ -102,15 +123,11 @@ async function startGameForRoom(io, room, connectedUsers, turnTimers) {
   await room.save();
 
   for (const player of room.players) {
-    const pid = player.userId.toString();
+    const pid = getPlayerUserId(player);
     const playerView = getPlayerView(game, pid);
     emitToUser(io, connectedUsers, pid, 'game_start', {
-      gameId: game._id.toString(),
-      boardSize: game.boardSize,
+      ...getPlayerGamePayload(game, pid),
       boards: playerView,
-      turn: game.turn.toString(),
-      turnStartedAt: game.turnStartedAt,
-      players: game.players.map((p) => p.toString()),
     });
   }
 
@@ -154,6 +171,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         }
         resolvedFleet.push({
           shipTemplateId: ship._id,
+          name: ship.name || `Statek ${resolvedFleet.length + 1}`,
           positions: item.positions,
           abilityType: ship.abilityType,
           hits: [],
@@ -242,6 +260,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {
+          const pidStr = pid.toString();
           emitToUser(io, connectedUsers, pid.toString(), 'move_result', {
             playerId: userId,
             x,
@@ -249,6 +268,9 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
             hit: result.hit,
             sunk: result.sunk,
             shipIndex: result.shipIndex,
+            sunkPositions: result.sunkPositions || [],
+            boards: getPlayerView(game, pidStr),
+            fleet: game.fleets.get(pidStr) || [],
           });
           emitToUser(io, connectedUsers, pid.toString(), 'game_over', { winnerId });
         }
@@ -264,18 +286,20 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         const room = await Room.findById(game.roomId);
 
         for (const pid of game.players) {
+          const pidStr = pid.toString();
           emitToUser(io, connectedUsers, pid.toString(), 'move_result', {
             playerId: userId,
             x,
             y,
             hit: false,
             sunk: false,
-          });
-          emitToUser(io, connectedUsers, pid.toString(), 'turn_update', {
-            turn: nextPlayerId,
-            turnStartedAt: game.turnStartedAt,
+            sunkPositions: [],
+            boards: getPlayerView(game, pidStr),
+            fleet: game.fleets.get(pidStr) || [],
           });
         }
+
+        emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
 
         clearTurnTimer(turnTimers, gameId);
         scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
@@ -287,6 +311,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         await game.save();
 
         for (const pid of game.players) {
+          const pidStr = pid.toString();
           emitToUser(io, connectedUsers, pid.toString(), 'move_result', {
             playerId: userId,
             x,
@@ -294,6 +319,9 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
             hit: true,
             sunk: result.sunk,
             shipIndex: result.shipIndex,
+            sunkPositions: result.sunkPositions || [],
+            boards: getPlayerView(game, pidStr),
+            fleet: game.fleets.get(pidStr) || [],
           });
         }
 
@@ -342,27 +370,19 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           break;
         case 'sonar': {
           const sonarResult = useSonar(game, userId, shipIndex);
-          await game.save();
-          const room = await Room.findById(game.roomId);
-          clearTurnTimer(turnTimers, gameId);
           const nextPlayerId = endTurn(game, userId);
           tickCooldowns(game, nextPlayerId);
           await game.save();
+          const room = await Room.findById(game.roomId);
+          clearTurnTimer(turnTimers, gameId);
           scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
 
-          socket.emit('sonar_result', sonarResult);
-          for (const pid of game.players) {
-            if (pid.toString() !== userId) {
-              emitToUser(io, connectedUsers, pid.toString(), 'turn_update', {
-                turn: nextPlayerId,
-                turnStartedAt: game.turnStartedAt,
-              });
-            }
-          }
-          emitToUser(io, connectedUsers, userId, 'turn_update', {
-            turn: nextPlayerId,
-            turnStartedAt: game.turnStartedAt,
+          socket.emit('sonar_result', {
+            ...sonarResult,
+            positions: sonarResult.nearest ? [sonarResult.nearest] : [],
+            fleet: game.fleets.get(userId) || [],
           });
+          emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
           return;
         }
         default:
@@ -378,10 +398,13 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         clearTurnTimer(turnTimers, gameId);
 
         for (const pid of game.players) {
+          const pidStr = pid.toString();
           emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
             results,
             shipIndex,
             playerId: userId,
+            boards: getPlayerView(game, pidStr),
+            fleet: game.fleets.get(pidStr) || [],
           });
           emitToUser(io, connectedUsers, pid.toString(), 'game_over', { winnerId });
         }
@@ -396,16 +419,16 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       scheduleTurnTimer(io, connectedUsers, turnTimers, game, room);
 
       for (const pid of game.players) {
+        const pidStr = pid.toString();
         emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
           results,
           shipIndex,
           playerId: userId,
-        });
-        emitToUser(io, connectedUsers, pid.toString(), 'turn_update', {
-          turn: nextPlayerId,
-          turnStartedAt: game.turnStartedAt,
+          boards: getPlayerView(game, pidStr),
+          fleet: game.fleets.get(pidStr) || [],
         });
       }
+      emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
     } catch (err) {
       console.error('use_ability error:', err);
       socket.emit('error', { message: err.message || 'Failed to use ability' });
@@ -423,20 +446,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       const isPlayer = game.players.some((p) => p.toString() === userId);
       if (!isPlayer) return socket.emit('error', { message: 'Not a player in this game' });
 
-      const playerView = getPlayerView(game, userId);
-
-      socket.emit('game_state', {
-        gameId: game._id.toString(),
-        boardSize: game.boardSize,
-        boards: playerView,
-        turn: game.turn ? game.turn.toString() : null,
-        turnStartedAt: game.turnStartedAt,
-        status: game.status,
-        winnerId: game.winnerId ? game.winnerId.toString() : null,
-        skips: Object.fromEntries(game.skips),
-        players: game.players.map((p) => p.toString()),
-        fleet: game.fleets.get(userId) || [],
-      });
+      socket.emit('game_state', getPlayerGamePayload(game, userId));
     } catch (err) {
       console.error('reconnect_game error:', err);
       socket.emit('error', { message: 'Failed to reconnect to game' });

@@ -10,6 +10,7 @@ export function GameProvider({ children }) {
 
   const [gameId, setGameId] = useState(null)
   const [boardSize, setBoardSize] = useState(10)
+  const [turnTimeLimit, setTurnTimeLimit] = useState(60)
   const [boards, setBoards] = useState({})
   const [myFleet, setMyFleet] = useState([])
   const [turn, setTurn] = useState(null)
@@ -22,6 +23,7 @@ export function GameProvider({ children }) {
   const setGameData = useCallback((data) => {
     if (data.gameId) setGameId(data.gameId)
     if (data.boardSize) setBoardSize(data.boardSize)
+    if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
     if (data.boards) {
       const normalised = {}
       Object.entries(data.boards).forEach(([pid, boardData]) => {
@@ -41,6 +43,7 @@ export function GameProvider({ children }) {
   const clearGame = useCallback(() => {
     setGameId(null)
     setBoardSize(10)
+    setTurnTimeLimit(60)
     setBoards({})
     setMyFleet([])
     setTurn(null)
@@ -65,16 +68,20 @@ export function GameProvider({ children }) {
     const handleGameStart = (data) => {
       setGameId(data.gameId)
       setBoardSize(data.boardSize)
+      if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
       setBoards(normaliseBoardData(data.boards))
+      setMyFleet(data.fleet || [])
       setTurn(data.turn)
       setTurnStartedAt(data.turnStartedAt)
       setPlayers(data.players || [])
-      setStatus('playing')
+      setStatus(data.status || 'in_game')
+      if (data.skips) setSkips(data.skips)
     }
 
     const handleGameState = (data) => {
       if (data.gameId) setGameId(data.gameId)
       if (data.boardSize) setBoardSize(data.boardSize)
+      if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
       if (data.boards) setBoards(normaliseBoardData(data.boards))
       if (data.fleet) setMyFleet(data.fleet)
       if (data.turn !== undefined) setTurn(data.turn)
@@ -85,8 +92,13 @@ export function GameProvider({ children }) {
       if (data.skips) setSkips(data.skips)
     }
 
-    const handleMoveResult = ({ playerId, x, y, hit, sunk }) => {
+    const handleMoveResult = ({ playerId, x, y, hit, sunk, boards: payloadBoards, fleet }) => {
       if (!user) return
+      if (payloadBoards) setBoards(normaliseBoardData(payloadBoards))
+      if (fleet) setMyFleet(fleet)
+
+      if (payloadBoards) return
+
       setBoards(prev => {
         // Attacker is playerId. Their shot lands on the OTHER player's board.
         const targetId = playerId === user._id
@@ -102,8 +114,13 @@ export function GameProvider({ children }) {
       })
     }
 
-    const handleAbilityResult = ({ results, playerId }) => {
+    const handleAbilityResult = ({ results, playerId, boards: payloadBoards, fleet }) => {
       if (!user || !results) return
+      if (payloadBoards) setBoards(normaliseBoardData(payloadBoards))
+      if (fleet) setMyFleet(fleet)
+
+      if (payloadBoards) return
+
       setBoards(prev => {
         const targetId = playerId === user._id
           ? Object.keys(prev).find(id => id !== user._id)
@@ -119,10 +136,11 @@ export function GameProvider({ children }) {
       })
     }
 
-    const handleTurnUpdate = ({ turn: newTurn, turnStartedAt: newTsa, skips: newSkips }) => {
+    const handleTurnUpdate = ({ turn: newTurn, turnStartedAt: newTsa, skips: newSkips, fleet }) => {
       setTurn(newTurn)
       setTurnStartedAt(newTsa)
       if (newSkips) setSkips(newSkips)
+      if (fleet) setMyFleet(fleet)
     }
 
     const handleGameOver = ({ winnerId: wid }) => {
@@ -150,7 +168,7 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider value={{
       gameId, boardSize, boards, myFleet, turn, turnStartedAt,
-      status, winnerId, players, skips, setGameData, clearGame,
+      turnTimeLimit, status, winnerId, players, skips, setGameData, clearGame,
     }}>
       {children}
     </GameContext.Provider>

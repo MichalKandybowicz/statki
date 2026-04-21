@@ -41,7 +41,14 @@ async function initGame(room, playerFleets, templateTiles = null) {
     }
 
     boards.set(playerId, { hidden: hiddenBoard, visible: visibleBoard });
-    fleets.set(playerId, fleet.map((s) => ({ ...s, hits: [], isSunk: false, cooldownRemaining: 0 })));
+    fleets.set(playerId, fleet.map((s, index) => ({
+      ...s,
+      name: s.name || `Statek ${index + 1}`,
+      abilityType: s.abilityType || null,
+      hits: [],
+      isSunk: false,
+      cooldownRemaining: 0,
+    })));
     skips.set(playerId, 0);
   }
 
@@ -52,6 +59,7 @@ async function initGame(room, playerFleets, templateTiles = null) {
     roomId: room._id,
     players: playerIds,
     boardSize,
+    turnTimeLimit: room.settings.turnTimeLimit || 60,
     boards,
     fleets,
     turn: firstPlayer,
@@ -67,7 +75,7 @@ async function initGame(room, playerFleets, templateTiles = null) {
 
 /**
  * Processes a shot from a player.
- * @returns {{ hit: boolean, sunk: boolean, shipIndex?: number, alreadyShot: boolean }}
+ * @returns {{ hit: boolean, sunk: boolean, shipIndex?: number, alreadyShot: boolean, sunkPositions?: Array }}
  */
 function processMove(game, playerId, x, y) {
   const opponentId = game.players.find((p) => p.toString() !== playerId.toString());
@@ -94,6 +102,7 @@ function processMove(game, playerId, x, y) {
     const fleet = game.fleets.get(opponentId.toString());
     let hitShipIndex = -1;
     let isSunk = false;
+      let sunkPositions = [];
 
     for (let i = 0; i < fleet.length; i++) {
       const ship = fleet[i];
@@ -105,6 +114,7 @@ function processMove(game, playerId, x, y) {
         if (ship.hits.length >= ship.positions.length) {
           ship.isSunk = true;
           isSunk = true;
+          sunkPositions = ship.positions.map((pos) => ({ x: pos.x, y: pos.y }));
           // Mark sunk on both boards
           for (const pos of ship.positions) {
             hidden[pos.y][pos.x] = 'sunk';
@@ -120,7 +130,7 @@ function processMove(game, playerId, x, y) {
     game.markModified('boards');
     game.markModified('fleets');
 
-    return { hit: true, sunk: isSunk, shipIndex: hitShipIndex, alreadyShot: false };
+      return { hit: true, sunk: isSunk, shipIndex: hitShipIndex, alreadyShot: false, sunkPositions };
   } else {
     hidden[y][x] = 'miss';
     visible[y][x] = 'miss';
