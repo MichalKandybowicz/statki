@@ -101,12 +101,23 @@ function assert(condition, message) {
   const game = makeGame();
   const sonarShip = game.fleets.get('A')[1];
   sonarShip.cooldownRemaining = 0;
-  const sonar = useSonar(game, 'A', 1);
+  const sonar = useSonar(game, 'A', 1, { x: 4, y: 2 });
   assert(Array.isArray(sonar.positions) && sonar.positions.length === 1, 'size 3 sonar should reveal one position');
   assert(sonar.type === 'ship' && sonar.nearest, 'sonar should detect nearest ship');
+  assert(sonar.origin.x === 4 && sonar.origin.y === 2, 'sonar should remember scan origin');
   assert(game.fleets.get('A')[1].cooldownRemaining === 2, 'sonar cooldown should be 3 minus current turn');
   tickCooldowns(game, 'A');
   assert(game.fleets.get('A')[1].cooldownRemaining === 1, 'tickCooldowns should decrement cooldown');
+})();
+
+(function testSonarBlockedByRock() {
+  const game = makeGame();
+  const sonarShip = game.fleets.get('A')[1];
+  sonarShip.cooldownRemaining = 0;
+  game.boards.get('B').hidden[1][1] = 'rock';
+  const sonar = useSonar(game, 'A', 1, { x: 0, y: 0 });
+  assert(sonar.positions.length === 0, 'blocked sonar should reveal no ship positions');
+  assert(sonar.blocked === true, 'blocked sonar should report blocked state');
 })();
 
 console.log('ability tests ok')

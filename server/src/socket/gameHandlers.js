@@ -371,7 +371,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           results = useTargetShot(game, userId, shipIndex, targets);
           break;
         case 'sonar': {
-          const sonarResult = useSonar(game, userId, shipIndex);
+          const sonarResult = useSonar(game, userId, shipIndex, targets?.[0]);
           const nextPlayerId = endTurn(game, userId);
           tickCooldowns(game, nextPlayerId);
           await game.save();

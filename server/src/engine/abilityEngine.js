@@ -45,6 +45,46 @@ function isShotTile(tile) {
   return tile === 'miss' || tile === 'hit' || tile === 'sunk';
 }
 
+function getLinePoints(start, end) {
+  const points = [];
+  let x0 = start.x;
+  let y0 = start.y;
+  const x1 = end.x;
+  const y1 = end.y;
+
+  const dx = Math.abs(x1 - x0);
+  const dy = Math.abs(y1 - y0);
+  const sx = x0 < x1 ? 1 : -1;
+  const sy = y0 < y1 ? 1 : -1;
+  let err = dx - dy;
+
+  while (!(x0 === x1 && y0 === y1)) {
+    const e2 = err * 2;
+    if (e2 > -dy) {
+      err -= dy;
+      x0 += sx;
+    }
+    if (e2 < dx) {
+      err += dx;
+      y0 += sy;
+    }
+    points.push({ x: x0, y: y0 });
+  }
+
+  return points;
+}
+
+function isBlockedByRock(hiddenBoard, start, end) {
+  const line = getLinePoints(start, end);
+  for (let i = 0; i < line.length - 1; i++) {
+    const point = line[i];
+    if (hiddenBoard[point.y]?.[point.x] === 'rock') {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Linear shot: fires a segment chosen by the player horizontally or vertically.
  */
@@ -173,24 +213,34 @@ function useTargetShot(game, playerId, shipIndex, targets) {
 /**
  * Sonar: reveals nearest undiscovered ship/rock positions. Number of scans depends on size.
  */
-function useSonar(game, playerId, shipIndex) {
+function useSonar(game, playerId, shipIndex, target) {
   const { fleet, ship, rules } = validateShipForAbility(game, playerId, shipIndex);
+  if (!target || target.x === undefined || target.y === undefined) {
+    throw new Error('Target point is required for sonar');
+  }
+  if (target.x < 0 || target.x >= game.boardSize || target.y < 0 || target.y >= game.boardSize) {
+    throw new Error('Sonar target out of bounds');
+  }
   const opponentId = getOpponentId(game, playerId);
   const hidden = game.boards.get(opponentId).hidden;
 
-  const centerX = Math.round(ship.positions.reduce((sum, pos) => sum + pos.x, 0) / ship.positions.length);
-  const centerY = Math.round(ship.positions.reduce((sum, pos) => sum + pos.y, 0) / ship.positions.length);
-
   const candidates = [];
+  let blockedShipExists = false;
   for (let y = 0; y < game.boardSize; y++) {
     for (let x = 0; x < game.boardSize; x++) {
       const tile = hidden[y][x];
-      if (tile === 'ship' || tile === 'rock') {
+      if (tile === 'ship') {
+        const blocked = isBlockedByRock(hidden, target, { x, y });
+        if (blocked) {
+          blockedShipExists = true;
+          continue;
+        }
+
         candidates.push({
           x,
           y,
           type: tile,
-          dist: Math.abs(x - centerX) + Math.abs(y - centerY),
+          dist: Math.abs(x - target.x) + Math.abs(y - target.y),
         });
       }
     }
@@ -210,6 +260,8 @@ function useSonar(game, playerId, shipIndex) {
     nearest: revealed[0] ? { x: revealed[0].x, y: revealed[0].y } : null,
     positions,
     scanCount: rules.scanCount,
+    blocked: blockedShipExists && revealed.length === 0,
+    origin: target,
   };
 }
 

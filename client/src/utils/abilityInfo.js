@@ -49,8 +49,8 @@ export function getAbilityInfo(type, size = 1) {
         label: 'Sonar',
         shortLabel: 'Sonar',
         cooldown,
-        description: `Wykrywa ${scanCount} najbliższe cele (statki lub skały) na planszy przeciwnika. Za każde rozpoczęte 3 pola statku dostajesz 1 skan.`,
-        targeting: 'Nie wymaga wskazywania celu — działa automatycznie.',
+        description: `Oddajesz impuls sonarowy w wybrane pole. Sonar pokazuje do ${scanCount} najbliższych pól statków od miejsca skanu, ale skały blokują wykrycie.`,
+        targeting: 'Wymaga wskazania pola na planszy przeciwnika.',
         requirement: '1-3 pola = 1 skan, 4-6 = 2 skany, 7 = 3 skany.',
       }
     }

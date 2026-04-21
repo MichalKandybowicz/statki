@@ -60,12 +60,14 @@ export default function GamePage() {
     if (!socket) return
 
     const onError = ({ message }) => setError(message)
-    const onSonar = ({ positions, type, nearest, scanCount }) => {
+    const onSonar = ({ positions, type, nearest, scanCount, blocked, origin }) => {
       setSonarPositions(positions || [])
       setSonarMessage(
         nearest
-          ? `Sonar wykrył ${type === 'ship' ? 'statek' : type === 'rock' ? 'skałę' : 'wodę'} — aktywnych skanów: ${scanCount}. Najbliższy sygnał: ${String.fromCharCode(65 + nearest.y)}${nearest.x + 1}`
-          : 'Sonar nie wykrył żadnego celu.'
+          ? `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} wykrył ${scanCount} sygnał(y). Najbliższy statek: ${String.fromCharCode(65 + nearest.y)}${nearest.x + 1}`
+          : blocked
+            ? `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} został zablokowany przez skały.`
+            : `Sonar od pola ${String.fromCharCode(65 + origin.y)}${origin.x + 1} nie wykrył żadnego statku.`
       )
       setTimeout(() => {
         setSonarPositions([])
@@ -111,6 +113,16 @@ export default function GamePage() {
         return
       }
 
+      if (targetingMode.type === 'sonar') {
+        socket?.emit('use_ability', {
+          gameId,
+          shipIndex: targetingMode.shipIndex,
+          targets: [{ x, y }],
+        })
+        setTargetingMode(null)
+        return
+      }
+
       const alreadyChosen = targetingMode.targets.some(target => target.x === x && target.y === y)
       if (alreadyChosen) return
       if (targetingMode.targets.length >= targetingMode.maxTargets) return
@@ -130,6 +142,11 @@ export default function GamePage() {
 
     if (ship.abilityType === 'linear') {
       setTargetingMode({ type: 'linear', shipIndex, maxTargets: 1, targets: [] })
+      return
+    }
+
+    if (ship.abilityType === 'sonar') {
+      setTargetingMode({ type: 'sonar', shipIndex, maxTargets: 1, targets: [] })
       return
     }
 
@@ -177,6 +194,8 @@ export default function GamePage() {
             <span>
               🎯 {selectedShip?.name || `Statek ${targetingMode.shipIndex + 1}`} — {targetingMode.type === 'linear'
                 ? `kliknij początek salwy (${linearDirection === 'horizontal' ? 'poziomo' : 'pionowo'}, długość ${selectedShip?.positions?.length || 1})`
+                : targetingMode.type === 'sonar'
+                  ? 'kliknij pole, z którego ma pójść impuls sonaru'
                 : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
             </span>
             {targetingMode.type === 'linear' && (

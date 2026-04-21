@@ -57,7 +57,13 @@ export default function AbilityPanel({ fleet, selectedShipIndex, onUseAbility, i
               fontWeight: 700,
             }}
           >
-            {ship.abilityType === 'target' ? 'Wybierz cele' : ship.abilityType === 'linear' ? 'Wybierz linię' : 'Użyj umiejętności'}
+            {ship.abilityType === 'target'
+              ? 'Wybierz cele'
+              : ship.abilityType === 'linear'
+                ? 'Wybierz linię'
+                : ship.abilityType === 'sonar'
+                  ? 'Wybierz punkt skanu'
+                  : 'Użyj umiejętności'}
           </button>
         </div>
       </div>
