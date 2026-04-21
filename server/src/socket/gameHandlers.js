@@ -175,9 +175,9 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       // Resolve ship templates and validate
       const resolvedFleet = [];
       for (const item of fleet) {
-        const ship = await ShipTemplate.findById(item.shipTemplateId);
+        const ship = await ShipTemplate.findOne({ _id: item.shipTemplateId, ownerId: userId });
         if (!ship) {
-          return socket.emit('error', { message: `Ship template ${item.shipTemplateId} not found` });
+          return socket.emit('error', { message: `Ship template ${item.shipTemplateId} not found in your collection` });
         }
         resolvedFleet.push({
           shipTemplateId: ship._id,

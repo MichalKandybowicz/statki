@@ -1,7 +1,7 @@
 import ShipGrid from './ShipGrid.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
-export default function ShipCard({ ship, onDelete, onEdit }) {
+export default function ShipCard({ ship, onDelete, onEdit, onToggleFavorite, isFavorite, onSecondaryAction, secondaryActionLabel }) {
   const cellCount = ship.shape?.flat().filter(v => v === 1).length || 0
   const ability = getAbilityInfo(ship.abilityType, ship.size || cellCount)
 
@@ -23,10 +23,16 @@ export default function ShipCard({ ship, onDelete, onEdit }) {
         </div>
       </div>
       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+        {onToggleFavorite && (
+          <button onClick={() => onToggleFavorite(ship)} style={favoriteBtnStyle}>{isFavorite ? '★' : '☆'}</button>
+        )}
+        {onSecondaryAction && (
+          <button onClick={() => onSecondaryAction(ship)} style={copyBtnStyle}>{secondaryActionLabel || 'Akcja'}</button>
+        )}
         {onEdit && (
           <button onClick={() => onEdit(ship)} style={editBtnStyle}>Edytuj</button>
         )}
-        <button onClick={() => onDelete(ship._id || ship.id)} style={deleteBtnStyle}>Usuń</button>
+        {onDelete && <button onClick={() => onDelete(ship._id || ship.id)} style={deleteBtnStyle}>Usuń</button>}
       </div>
     </div>
   )
@@ -60,3 +66,24 @@ const deleteBtnStyle = {
   fontSize: '0.78rem',
   cursor: 'pointer',
 }
+
+const favoriteBtnStyle = {
+  background: 'rgba(251,191,36,0.1)',
+  color: '#fbbf24',
+  border: '1px solid rgba(251,191,36,0.28)',
+  borderRadius: '5px',
+  padding: '4px 10px',
+  fontSize: '0.78rem',
+  cursor: 'pointer',
+}
+
+const copyBtnStyle = {
+  background: 'rgba(16,185,129,0.12)',
+  color: '#6ee7b7',
+  border: '1px solid rgba(16,185,129,0.35)',
+  borderRadius: '5px',
+  padding: '4px 10px',
+  fontSize: '0.78rem',
+  cursor: 'pointer',
+}
+

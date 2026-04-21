@@ -63,6 +63,30 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/ships/community
+router.get('/community', async (req, res) => {
+  try {
+    const ships = await ShipTemplate.find()
+      .populate('ownerId', 'email')
+      .sort({ _id: -1 })
+      .lean();
+
+    res.json(
+      ships.map((ship) => ({
+        ...ship,
+        owner: {
+          _id: ship.ownerId?._id,
+          email: ship.ownerId?.email,
+        },
+        isOwn: ship.ownerId?._id?.toString() === req.user._id.toString(),
+      }))
+    );
+  } catch (err) {
+    console.error('List community ships error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/ships
 router.post('/', async (req, res) => {
   try {
@@ -147,6 +171,69 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Ship deleted' });
   } catch (err) {
     console.error('Delete ship error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ships/:id/favorite
+router.post('/:id/favorite', async (req, res) => {
+  try {
+    const ship = await ShipTemplate.findById(req.params.id);
+    if (!ship) return res.status(404).json({ error: 'Ship not found' });
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { favoriteShips: ship._id } },
+      { new: true }
+    );
+
+    res.json({ favoriteShips: user.favoriteShips || [] });
+  } catch (err) {
+    console.error('Favorite ship error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/ships/:id/favorite
+router.delete('/:id/favorite', async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $pull: { favoriteShips: req.params.id } },
+      { new: true }
+    );
+
+    res.json({ favoriteShips: user.favoriteShips || [] });
+  } catch (err) {
+    console.error('Unfavorite ship error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/ships/:id/copy
+router.post('/:id/copy', async (req, res) => {
+  try {
+    const sourceShip = await ShipTemplate.findById(req.params.id).lean();
+    if (!sourceShip) return res.status(404).json({ error: 'Ship not found' });
+
+    const providedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const copyName = providedName || `${sourceShip.name} (kopia)`;
+
+    const nameError = validateName(copyName);
+    if (nameError) return res.status(400).json({ error: nameError });
+
+    const copiedShip = new ShipTemplate({
+      ownerId: req.user._id,
+      name: copyName,
+      shape: sourceShip.shape,
+      size: sourceShip.size,
+      abilityType: sourceShip.abilityType,
+    });
+    await copiedShip.save();
+
+    res.status(201).json(copiedShip);
+  } catch (err) {
+    console.error('Copy ship error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

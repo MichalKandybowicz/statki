@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { boards as boardsApi } from '../../services/api'
+import useAuth from '../../hooks/useAuth'
 
 export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
+  const { user } = useAuth()
   const [turnTimeLimit, setTurnTimeLimit] = useState(60)
   const [shipLimit, setShipLimit] = useState(5)
   const [password, setPassword] = useState('')
@@ -18,6 +20,19 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   }, [])
 
   const selectedBoard = availableBoards.find(b => (b._id || b.id) === boardTemplateId)
+  const favoriteBoardIds = useMemo(
+    () => new Set((user?.favoriteBoards || []).map(String)),
+    [user?.favoriteBoards]
+  )
+  const orderedBoards = useMemo(
+    () => [...availableBoards].sort((a, b) => {
+      const aFav = favoriteBoardIds.has(String(a._id || a.id))
+      const bFav = favoriteBoardIds.has(String(b._id || b.id))
+      if (aFav === bFav) return 0
+      return aFav ? -1 : 1
+    }),
+    [availableBoards, favoriteBoardIds]
+  )
 
   function handleSubmit(e) {
     e.preventDefault()
@@ -54,9 +69,10 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
             <div style={fieldStyle}>
               <label style={labelStyle}>Plansza</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {availableBoards.map(b => {
+                {orderedBoards.map(b => {
                   const id = b._id || b.id
                   const isSelected = id === boardTemplateId
+                  const isFavorite = favoriteBoardIds.has(String(id))
                   return (
                     <div
                       key={id}
@@ -70,7 +86,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
                       }}
                     >
                       <span style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-                        {b.name || `Plansza ${b.size}×${b.size}`}
+                        {isFavorite ? '★ ' : ''}{b.name || `Plansza ${b.size}×${b.size}`}
                       </span>
                       <span style={{ color: '#475569', fontSize: '0.78rem' }}>{b.size}×{b.size}</span>
                     </div>

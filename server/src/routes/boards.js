@@ -1,5 +1,6 @@
 const express = require('express');
 const BoardTemplate = require('../models/BoardTemplate');
+const User = require('../models/User');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
@@ -19,6 +20,16 @@ function validateTiles(tiles, size) {
         return "Tiles must be 'water' or 'rock'";
       }
     }
+  }
+  return null;
+}
+
+function validateBoardName(name) {
+  if (typeof name !== 'string' || !name.trim()) {
+    return 'Board name is required';
+  }
+  if (name.trim().length > 60) {
+    return 'Board name must be at most 60 characters';
   }
   return null;
 }
@@ -49,7 +60,10 @@ router.get('/:id', async (req, res) => {
 // POST /api/boards
 router.post('/', async (req, res) => {
   try {
-    const { size, tiles } = req.body;
+    const { name, size, tiles } = req.body;
+
+    const nameError = validateBoardName(name);
+    if (nameError) return res.status(400).json({ error: nameError });
 
     if (!size || size < 10 || size > 25) {
       return res.status(400).json({ error: 'Size must be between 10 and 25' });
@@ -58,7 +72,7 @@ router.post('/', async (req, res) => {
     const tilesError = validateTiles(tiles, size);
     if (tilesError) return res.status(400).json({ error: tilesError });
 
-    const board = new BoardTemplate({ ownerId: req.user._id, size, tiles });
+    const board = new BoardTemplate({ ownerId: req.user._id, name: name.trim(), size, tiles });
     await board.save();
     res.status(201).json(board);
   } catch (err) {
@@ -73,11 +87,17 @@ router.put('/:id', async (req, res) => {
     const board = await BoardTemplate.findOne({ _id: req.params.id, ownerId: req.user._id });
     if (!board) return res.status(404).json({ error: 'Board not found' });
 
-    const { size, tiles } = req.body;
+    const { name, size, tiles } = req.body;
 
     const newSize = size !== undefined ? size : board.size;
     if (newSize < 10 || newSize > 25) {
       return res.status(400).json({ error: 'Size must be between 10 and 25' });
+    }
+
+    if (name !== undefined) {
+      const nameError = validateBoardName(name);
+      if (nameError) return res.status(400).json({ error: nameError });
+      board.name = name.trim();
     }
 
     if (tiles !== undefined) {
@@ -87,6 +107,9 @@ router.put('/:id', async (req, res) => {
     }
 
     board.size = newSize;
+    if (!board.name) {
+      board.name = `Plansza ${newSize}x${newSize}`;
+    }
     await board.save();
     res.json(board);
   } catch (err) {
@@ -103,9 +126,50 @@ router.delete('/:id', async (req, res) => {
       ownerId: req.user._id,
     });
     if (!board) return res.status(404).json({ error: 'Board not found' });
+
+    await User.updateMany(
+      { favoriteBoards: board._id },
+      { $pull: { favoriteBoards: board._id } }
+    );
+
     res.json({ message: 'Board deleted' });
   } catch (err) {
     console.error('Delete board error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/boards/:id/favorite
+router.post('/:id/favorite', async (req, res) => {
+  try {
+    const board = await BoardTemplate.findById(req.params.id);
+    if (!board) return res.status(404).json({ error: 'Board not found' });
+
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $addToSet: { favoriteBoards: board._id } },
+      { new: true }
+    );
+
+    res.json({ favoriteBoards: user.favoriteBoards || [] });
+  } catch (err) {
+    console.error('Favorite board error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// DELETE /api/boards/:id/favorite
+router.delete('/:id/favorite', async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $pull: { favoriteBoards: req.params.id } },
+      { new: true }
+    );
+
+    res.json({ favoriteBoards: user.favoriteBoards || [] });
+  } catch (err) {
+    console.error('Unfavorite board error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

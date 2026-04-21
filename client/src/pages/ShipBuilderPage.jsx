@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { ships as shipsApi } from '../services/api'
 import ShipGrid from '../components/ships/ShipGrid.jsx'
 import ShipCard from '../components/ships/ShipCard.jsx'
+import useAuth from '../hooks/useAuth'
 import { isContiguous, getShipCells } from '../utils/boardUtils.js'
 import { getAbilityCards, getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
 
@@ -12,16 +13,31 @@ export default function ShipBuilderPage() {
   const [shape, setShape] = useState(EMPTY())
   const [abilityType, setAbilityType] = useState('linear')
   const [savedShips, setSavedShips] = useState([])
+  const [communityShips, setCommunityShips] = useState([])
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
+  const [copyingShipId, setCopyingShipId] = useState(null)
+  const { user, refreshUser } = useAuth()
 
-  useEffect(() => { loadShips() }, [])
+  useEffect(() => {
+    loadShips()
+    loadCommunityShips()
+  }, [])
 
   async function loadShips() {
     try {
       const res = await shipsApi.list()
       setSavedShips(res.data || [])
     } catch {}
+  }
+
+  async function loadCommunityShips() {
+    try {
+      const res = await shipsApi.listCommunity()
+      setCommunityShips(res.data || [])
+    } catch {
+      setCommunityShips([])
+    }
   }
 
   function toggle(r, c) {
@@ -54,6 +70,7 @@ export default function ShipBuilderPage() {
       if (editingId) await shipsApi.update(editingId, payload)
       else await shipsApi.create(payload)
       await loadShips()
+      await loadCommunityShips()
       resetForm()
     } catch (err) {
       setError(err.response?.data?.error || 'Nie udało się zapisać statku')
@@ -64,8 +81,36 @@ export default function ShipBuilderPage() {
     try {
       await shipsApi.delete(id)
       await loadShips()
+      await loadCommunityShips()
       if (editingId === id) resetForm()
     } catch {}
+  }
+
+  async function handleToggleFavorite(ship) {
+    const id = ship._id || ship.id
+    const favoriteIds = new Set((user?.favoriteShips || []).map(String))
+    try {
+      if (favoriteIds.has(String(id))) {
+        await shipsApi.unfavorite(id)
+      } else {
+        await shipsApi.favorite(id)
+      }
+      await refreshUser?.()
+    } catch {}
+  }
+
+  async function handleCopyShip(ship) {
+    const id = ship._id || ship.id
+    setCopyingShipId(String(id))
+    try {
+      await shipsApi.copy(id)
+      await loadShips()
+      await loadCommunityShips()
+    } catch (err) {
+      setError(err.response?.data?.error || 'Nie udało się skopiować statku')
+    } finally {
+      setCopyingShipId(null)
+    }
   }
 
   function handleEdit(ship) {
@@ -79,6 +124,13 @@ export default function ShipBuilderPage() {
   const cellCount = getShipCells(shape).length
   const selectedAbility = getAbilityInfo(abilityType, cellCount || 1)
   const abilityCards = getAbilityCards(cellCount || 1)
+  const favoriteShipIds = new Set((user?.favoriteShips || []).map(String))
+  const sortedMyShips = [...savedShips].sort((a, b) => {
+    const aFav = favoriteShipIds.has(String(a._id || a.id))
+    const bFav = favoriteShipIds.has(String(b._id || b.id))
+    if (aFav === bFav) return 0
+    return aFav ? -1 : 1
+  })
   const inp = {
     width: '100%',
     background: '#0f1923',
@@ -174,9 +226,40 @@ export default function ShipBuilderPage() {
             <p style={{ color: '#64748b' }}>Nie masz jeszcze żadnych statków.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {savedShips.map(s => (
-                <ShipCard key={s._id || s.id} ship={s} onDelete={handleDelete} onEdit={handleEdit} />
+              {sortedMyShips.map(s => (
+                <ShipCard
+                  key={s._id || s.id}
+                  ship={s}
+                  onDelete={handleDelete}
+                  onEdit={handleEdit}
+                  onToggleFavorite={handleToggleFavorite}
+                  isFavorite={favoriteShipIds.has(String(s._id || s.id))}
+                />
               ))}
+            </div>
+          )}
+
+          <h2 style={{ color: '#e2e8f0', fontSize: '1.1rem', marginTop: '26px', marginBottom: '14px' }}>Wszystkie statki w grze ({communityShips.length})</h2>
+          {communityShips.length === 0 ? (
+            <p style={{ color: '#64748b' }}>Brak statków do wyświetlenia.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {communityShips.map(s => {
+                const isOwn = !!s.isOwn
+                const ownerLabel = s.owner?.email ? `Autor: ${s.owner.email}` : 'Autor: nieznany'
+                return (
+                  <div key={`community-${s._id || s.id}`}>
+                    <div style={{ color: '#64748b', fontSize: '0.72rem', marginBottom: '4px' }}>{ownerLabel}</div>
+                    <ShipCard
+                      ship={s}
+                      onToggleFavorite={handleToggleFavorite}
+                      isFavorite={favoriteShipIds.has(String(s._id || s.id))}
+                      onSecondaryAction={!isOwn ? handleCopyShip : undefined}
+                      secondaryActionLabel={copyingShipId === String(s._id || s.id) ? 'Kopiowanie…' : (!isOwn ? 'Kopiuj' : undefined)}
+                    />
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

@@ -1,7 +1,10 @@
 import ShipGrid from '../ships/ShipGrid.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
+import useAuth from '../../hooks/useAuth'
 
 export default function ShipSelector({ ships, onSelect, selectedShip, onDragStart }) {
+  const { user } = useAuth()
+
   if (!ships || ships.length === 0) {
     return (
       <div style={{ minWidth: '160px' }}>
@@ -11,6 +14,14 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
     )
   }
 
+  const favoriteShipIds = new Set((user?.favoriteShips || []).map(String))
+  const orderedShips = [...ships].sort((a, b) => {
+    const aFav = favoriteShipIds.has(String(a._id || a.id))
+    const bFav = favoriteShipIds.has(String(b._id || b.id))
+    if (aFav === bFav) return 0
+    return aFav ? -1 : 1
+  })
+
   return (
     <div style={{ minWidth: '240px', maxWidth: '320px' }}>
       <h3 style={{ color: '#e2e8f0', fontSize: '0.95rem', marginBottom: '4px' }}>Wybierz statek</h3>
@@ -18,7 +29,7 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
         Kliknij lub przeciągnij na planszę · <kbd style={kbdStyle}>R</kbd> obrót
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        {ships.map(ship => {
+        {orderedShips.map(ship => {
           const id = ship._id || ship.id
           const selId = selectedShip?._id || selectedShip?.id
           const isSelected = id === selId
@@ -45,7 +56,9 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
             >
               <ShipGrid shape={ship.shape} readOnly />
               <div style={{ minWidth: 0 }}>
-                <div style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700, marginBottom: '2px' }}>{ship.name || 'Nienazwany statek'}</div>
+                <div style={{ color: '#e2e8f0', fontSize: '0.8rem', fontWeight: 700, marginBottom: '2px' }}>
+                  {favoriteShipIds.has(String(id)) ? '★ ' : ''}{ship.name || 'Nienazwany statek'}
+                </div>
                 <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: '2px' }}>{cells} pól · {ability.label}</div>
                 <div style={{ color: '#fbbf24', fontSize: '0.68rem', marginBottom: '3px' }}>CD: {formatCooldownTurns(ability.cooldown)}</div>
                 <div style={{ color: '#64748b', fontSize: '0.68rem', lineHeight: 1.4 }}>{ability.description}</div>

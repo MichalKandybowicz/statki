@@ -93,9 +93,13 @@ export const rooms = {
 
 export const ships = {
   list: () => axiosInstance.get('/ships'),
+  listCommunity: () => axiosInstance.get('/ships/community'),
   create: (data) => axiosInstance.post('/ships', data),
   update: (id, data) => axiosInstance.put(`/ships/${id}`, data),
   delete: (id) => axiosInstance.delete(`/ships/${id}`),
+  favorite: (id) => axiosInstance.post(`/ships/${id}/favorite`),
+  unfavorite: (id) => axiosInstance.delete(`/ships/${id}/favorite`),
+  copy: (id, data = {}) => axiosInstance.post(`/ships/${id}/copy`, data),
 }
 
 export const boards = {
@@ -104,6 +108,8 @@ export const boards = {
   create: (data) => axiosInstance.post('/boards', data),
   update: (id, data) => axiosInstance.put(`/boards/${id}`, data),
   delete: (id) => axiosInstance.delete(`/boards/${id}`),
+  favorite: (id) => axiosInstance.post(`/boards/${id}/favorite`),
+  unfavorite: (id) => axiosInstance.delete(`/boards/${id}/favorite`),
 }
 
 export default axiosInstance

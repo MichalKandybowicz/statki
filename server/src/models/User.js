@@ -17,12 +17,24 @@ const userSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
-  favoriteShips: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'ShipTemplate',
-    },
-  ],
+  favoriteShips: {
+    type: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ShipTemplate',
+      },
+    ],
+    default: [],
+  },
+  favoriteBoards: {
+    type: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'BoardTemplate',
+      },
+    ],
+    default: [],
+  },
 });
 
 userSchema.methods.toSafeObject = function () {
