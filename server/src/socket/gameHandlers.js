@@ -249,8 +249,10 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         clearTurnTimer(gameId);
         scheduleTurnTimer(game, room);
       } else {
-        // Hit: same player continues
+        // Hit: same player continues — reset turn timer start time
         game.lastActionAt = new Date();
+        game.turnStartedAt = new Date();
+        game.markModified('turnStartedAt');
         await game.save();
 
         for (const pid of game.players) {

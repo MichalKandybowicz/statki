@@ -4,6 +4,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 
 const connectDB = require('./src/config/db');
 const { initSocket } = require('./src/socket/index');
@@ -31,13 +32,33 @@ app.use(
 
 app.use(express.json({ limit: '1mb' }));
 
+// Global rate limiter (covers all routes)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
+// Strict limiter for auth endpoints to prevent brute-force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many auth attempts, please try again later' },
+});
+
+app.use(globalLimiter);
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/ships', shipRoutes);
 app.use('/api/boards', boardRoutes);

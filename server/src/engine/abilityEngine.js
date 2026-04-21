@@ -41,12 +41,14 @@ function useLinearShot(game, playerId, shipIndex) {
   const results = [];
 
   for (let x = 0; x < game.boardSize; x++) {
-    try {
-      const result = processMove(game, playerId, x, row);
-      results.push({ x, y: row, hit: result.hit, sunk: result.sunk, alreadyShot: result.alreadyShot });
-    } catch {
-      results.push({ x, y: row, hit: false, sunk: false, alreadyShot: false });
+    const opponentBoard = game.boards.get(opponentId.toString());
+    const tile = opponentBoard.hidden[row][x];
+    if (tile === 'miss' || tile === 'hit' || tile === 'sunk') {
+      results.push({ x, y: row, hit: tile === 'hit' || tile === 'sunk', sunk: tile === 'sunk', alreadyShot: true });
+      continue;
     }
+    const result = processMove(game, playerId, x, row);
+    results.push({ x, y: row, hit: result.hit, sunk: result.sunk, alreadyShot: false });
   }
 
   applyCooldown(fleet, shipIndex, 2);
