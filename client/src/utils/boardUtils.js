@@ -3,11 +3,13 @@ export function createEmptyBoard(size) {
 }
 
 export function rotateShape(shape) {
-  const n = shape.length
-  const rotated = Array.from({ length: n }, () => Array(n).fill(0))
-  for (let r = 0; r < n; r++) {
-    for (let c = 0; c < n; c++) {
-      rotated[c][n - 1 - r] = shape[r][c]
+  const rows = shape.length
+  const cols = Math.max(...shape.map(r => r.length))
+  // 90° clockwise: new dimensions are cols × rows
+  const rotated = Array.from({ length: cols }, () => Array(rows).fill(0))
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < (shape[r]?.length || 0); c++) {
+      rotated[c][rows - 1 - r] = shape[r][c]
     }
   }
   return rotated

@@ -2,23 +2,31 @@ import { useState, useEffect } from 'react'
 import { boards as boardsApi } from '../../services/api'
 
 export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
-  const [boardSize, setBoardSize] = useState(10)
   const [turnTimeLimit, setTurnTimeLimit] = useState(60)
   const [password, setPassword] = useState('')
   const [boardTemplateId, setBoardTemplateId] = useState('')
   const [availableBoards, setAvailableBoards] = useState([])
+  const [boardsLoading, setBoardsLoading] = useState(true)
 
   useEffect(() => {
     boardsApi.list().then(res => {
-      setAvailableBoards(res.data || [])
-    }).catch(() => {})
+      const list = res.data || []
+      setAvailableBoards(list)
+      if (list.length > 0) setBoardTemplateId(list[0]._id || list[0].id)
+    }).catch(() => {}).finally(() => setBoardsLoading(false))
   }, [])
+
+  const selectedBoard = availableBoards.find(b => (b._id || b.id) === boardTemplateId)
 
   function handleSubmit(e) {
     e.preventDefault()
-    const data = { boardSize, turnTimeLimit }
+    if (!boardTemplateId) return
+    const data = {
+      boardSize: selectedBoard?.size || 10,
+      turnTimeLimit,
+      boardTemplateId,
+    }
     if (password) data.password = password
-    if (boardTemplateId) data.boardTemplateId = boardTemplateId
     onSubmit(data)
   }
 
@@ -26,73 +34,82 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     <div style={overlayStyle} onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={modalStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-          <h2 style={{ color: '#e2e8f0', fontSize: '1.3rem' }}>Create Room</h2>
+          <h2 style={{ color: '#e2e8f0', fontSize: '1.3rem' }}>Utwórz pokój</h2>
           <button onClick={onClose} style={closeBtnStyle}>✕</button>
         </div>
 
         {error && <div style={errorStyle}>{error}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div style={fieldStyle}>
-            <label style={labelStyle}>
-              Board Size: <strong style={{ color: '#60a5fa' }}>{boardSize}×{boardSize}</strong>
-            </label>
-            <input
-              type="range" min="10" max="25" value={boardSize}
-              onChange={e => setBoardSize(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#2563eb' }}
-            />
-            <div style={rangeHintsStyle}><span>10</span><span>25</span></div>
+        {boardsLoading ? (
+          <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Ładowanie plansz…</p>
+        ) : availableBoards.length === 0 ? (
+          <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
+            Nie masz żadnych plansz. <a href="/boards" style={{ color: '#60a5fa' }}>Stwórz planszę</a>, a następnie wróć tutaj.
           </div>
-
-          <div style={fieldStyle}>
-            <label style={labelStyle}>
-              Turn Time Limit: <strong style={{ color: '#60a5fa' }}>{turnTimeLimit}s</strong>
-            </label>
-            <input
-              type="range" min="10" max="300" step="10" value={turnTimeLimit}
-              onChange={e => setTurnTimeLimit(Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#2563eb' }}
-            />
-            <div style={rangeHintsStyle}><span>10s</span><span>5min</span></div>
-          </div>
-
-          <div style={fieldStyle}>
-            <label style={labelStyle}>Password (optional)</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              style={inputStyle}
-              placeholder="Leave blank for public room"
-            />
-          </div>
-
-          {availableBoards.length > 0 && (
+        ) : (
+          <form onSubmit={handleSubmit}>
+            {/* Board picker */}
             <div style={fieldStyle}>
-              <label style={labelStyle}>Board Template (optional)</label>
-              <select
-                value={boardTemplateId}
-                onChange={e => setBoardTemplateId(e.target.value)}
-                style={{ ...inputStyle, cursor: 'pointer' }}
-              >
-                <option value="">No template (empty board)</option>
-                {availableBoards.map(b => (
-                  <option key={b._id || b.id} value={b._id || b.id}>
-                    {b.name || `${b.size}×${b.size} board`}
-                  </option>
-                ))}
-              </select>
+              <label style={labelStyle}>Plansza</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {availableBoards.map(b => {
+                  const id = b._id || b.id
+                  const isSelected = id === boardTemplateId
+                  return (
+                    <div
+                      key={id}
+                      onClick={() => setBoardTemplateId(id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
+                        background: isSelected ? 'rgba(37,99,235,0.15)' : '#0f1923',
+                        border: isSelected ? '1px solid rgba(37,99,235,0.5)' : '1px solid rgba(255,255,255,0.08)',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <span style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                        {b.name || `Plansza ${b.size}×${b.size}`}
+                      </span>
+                      <span style={{ color: '#475569', fontSize: '0.78rem' }}>{b.size}×{b.size}</span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          )}
 
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
-            <button type="button" onClick={onClose} style={cancelBtnStyle}>Cancel</button>
-            <button type="submit" disabled={loading} style={submitBtnStyle}>
-              {loading ? 'Creating…' : 'Create Room'}
-            </button>
-          </div>
-        </form>
+            {/* Turn time */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>
+                Czas na ruch: <strong style={{ color: '#60a5fa' }}>{turnTimeLimit}s</strong>
+              </label>
+              <input
+                type="range" min="10" max="300" step="10" value={turnTimeLimit}
+                onChange={e => setTurnTimeLimit(Number(e.target.value))}
+                style={{ width: '100%', accentColor: '#2563eb' }}
+              />
+              <div style={rangeHintsStyle}><span>10s</span><span>5min</span></div>
+            </div>
+
+            {/* Password */}
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Hasło (opcjonalne)</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                style={inputStyle}
+                placeholder="Zostaw puste dla pokoju publicznego"
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>
+              <button type="button" onClick={onClose} style={cancelBtnStyle}>Anuluj</button>
+              <button type="submit" disabled={loading || !boardTemplateId} style={submitBtnStyle}>
+                {loading ? 'Tworzenie…' : 'Utwórz pokój'}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   )

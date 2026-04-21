@@ -21,8 +21,9 @@ export default function GameSetupPage() {
     roomsApi.get(roomId).then(res => {
       const r = res.data
       setRoom(r)
-      if (r.boardTemplateId) {
-        boardsApi.get(r.boardTemplateId).then(br => setBoardTiles(br.data.tiles)).catch(() => {})
+      const templateId = r.settings?.boardTemplateId
+      if (templateId) {
+        boardsApi.get(templateId).then(br => setBoardTiles(br.data.tiles)).catch(() => {})
       }
     }).catch(() => {})
     shipsApi.list().then(res => setShips(res.data || [])).catch(() => {})
@@ -47,7 +48,7 @@ export default function GameSetupPage() {
     }
   }, [socket, roomId, navigate, setGameData])
 
-  const boardSize = room?.boardSize || 10
+  const boardSize = room?.settings?.boardSize || 10
   const tiles = boardTiles || createEmptyBoard(boardSize)
 
   return (
@@ -55,7 +56,7 @@ export default function GameSetupPage() {
       <h1 style={{ color:'#e2e8f0', marginBottom:'6px' }}>Fleet Placement</h1>
       {room && (
         <p style={{ color:'#64748b', fontSize:'0.85rem', marginBottom:'20px' }}>
-          Room: {boardSize}×{boardSize} board · {room.turnTimeLimit}s turns · Players: {room.players?.length || 0}/2
+          Room: {boardSize}×{boardSize} board · {room.settings?.turnTimeLimit}s turns · Players: {room.players?.length || 0}/2
         </p>
       )}
       {error && <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#f87171', padding:'10px 14px', borderRadius:'8px', marginBottom:'16px', fontSize:'0.875rem' }}>{error}</div>}

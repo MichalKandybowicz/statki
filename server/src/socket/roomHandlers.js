@@ -1,5 +1,5 @@
 const Room = require('../models/Room');
-const { emitToUser } = require('./index');
+const { emitToUser } = require('./socketUtils');
 
 function registerRoomHandlers(io, socket, connectedUsers) {
   const userId = socket.user._id.toString();

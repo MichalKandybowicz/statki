@@ -1,0 +1,10 @@
+{
+  "name": "statki",
+  "private": true,
+  "scripts": {
+    "setup": "sh ./scripts/setup.sh",
+    "dev": "sh ./scripts/dev.sh",
+    "up": "npm run setup && npm run dev"
+  }
+}
+

@@ -2,6 +2,7 @@ const { verifySocketToken } = require('../middleware/auth');
 const User = require('../models/User');
 const { registerRoomHandlers } = require('./roomHandlers');
 const { registerGameHandlers } = require('./gameHandlers');
+const { emitToUser } = require('./socketUtils');
 
 // Map of userId -> Set of socket ids (for reconnect / multi-tab support)
 const connectedUsers = new Map();
@@ -59,16 +60,5 @@ function initSocket(io) {
   return { connectedUsers, turnTimers };
 }
 
-/**
- * Emit an event to all sockets belonging to a given userId.
- */
-function emitToUser(io, connectedUsers, userId, event, data) {
-  const sockets = connectedUsers.get(userId.toString());
-  if (sockets) {
-    for (const socketId of sockets) {
-      io.to(socketId).emit(event, data);
-    }
-  }
-}
 
 module.exports = { initSocket, emitToUser };

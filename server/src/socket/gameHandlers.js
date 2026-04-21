@@ -6,7 +6,7 @@ const { initGame, processMove, checkWinCondition, getPlayerView, switchTurn } = 
 const { useLinearShot, useRandomShot, useTargetShot, useSonar, tickCooldowns } = require('../engine/abilityEngine');
 const { startTurn, endTurn, checkSkips, isTurnTimedOut } = require('../engine/turnEngine');
 const { validatePlacement } = require('../utils/shipPlacement');
-const { emitToUser } = require('./index');
+const { emitToUser } = require('./socketUtils');
 
 // Per-game fleet staging: Map<roomId, Map<userId, fleet>>
 const stagedFleets = new Map();
