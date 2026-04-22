@@ -72,22 +72,24 @@ export default function BoardBuilderPage() {
       <h1 style={{ color:'#e2e8f0', marginBottom:'24px' }}>Board Builder</h1>
       <div style={{ display:'flex', gap:'32px', flexWrap:'wrap', alignItems:'flex-start' }}>
         <div style={{ background:'#1a2940', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'12px', padding:'24px' }}>
-          <div style={{ display:'flex', gap:'12px', alignItems:'center', marginBottom:'16px', flexWrap:'wrap' }}>
-            <div style={{ minWidth: '230px', flex: 1 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'12px', marginBottom:'16px' }}>
+            <div>
               <label style={{ color:'#94a3b8', fontSize:'0.82rem', display:'block', marginBottom:'4px' }}>Nazwa mapy</label>
               <input
                 value={name}
                 onChange={e => setName(e.target.value)}
                 maxLength={60}
                 placeholder='Np. Archipelag Północny'
-                style={{ width: '100%', background:'#0f1923', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'10px 12px', color:'#e2e8f0', fontSize:'0.9rem' }}
+                style={{ width: '100%', boxSizing:'border-box', background:'#0f1923', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'10px 12px', color:'#e2e8f0', fontSize:'0.9rem' }}
               />
             </div>
-            <div>
-              <label style={{ color:'#94a3b8', fontSize:'0.82rem', display:'block', marginBottom:'4px' }}>Size: {size}×{size}</label>
-              <input type="range" min="10" max="25" value={size} onChange={e => { const s=Number(e.target.value); setSize(s); setTiles(createEmptyBoard(s)); setEditingId(null); setName('') }} style={{ accentColor:'#2563eb' }} />
+            <div style={{ display:'flex', alignItems:'center', gap:'16px', flexWrap:'wrap' }}>
+              <div style={{ flex:1, minWidth:'180px' }}>
+                <label style={{ color:'#94a3b8', fontSize:'0.82rem', display:'block', marginBottom:'4px' }}>Rozmiar: {size}×{size}</label>
+                <input type="range" min="10" max="25" value={size} onChange={e => { const s=Number(e.target.value); setSize(s); setTiles(createEmptyBoard(s)); setEditingId(null); setName('') }} style={{ accentColor:'#2563eb', width:'100%' }} />
+              </div>
+              <button onClick={newBoard} style={{ background:'rgba(255,255,255,0.07)', color:'#94a3b8', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'6px', padding:'7px 14px', cursor:'pointer', fontSize:'0.85rem', flexShrink:0 }}>Wyczyść</button>
             </div>
-            <button onClick={newBoard} style={{ background:'rgba(255,255,255,0.07)', color:'#94a3b8', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'6px', padding:'7px 14px', cursor:'pointer', fontSize:'0.85rem', marginTop:'16px' }}>Clear</button>
           </div>
           <div style={{ color:'#64748b', fontSize:'0.78rem', marginBottom:'10px' }}>Rocks: {rockCount} ({rockPct}%) — max 20%</div>
           <BoardGrid tiles={tiles} size={size} onToggle={toggleTile} />
