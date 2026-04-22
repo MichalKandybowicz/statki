@@ -29,12 +29,18 @@ const confirmBtnStyle = {
 }
 
 const SOUND_SETTINGS_KEY = 'statki:sound-settings:v1'
+const BATTLE_LAYOUT_KEY = 'statki:battle-layout:v1'
 const ABILITY_REVEAL_STEP_MS = 1000
 const DEFAULT_SOUND_SETTINGS = {
   masterVolume: 0.8,
   turnEnd: { enabled: true, volume: 0.9, src: '/sounds/turn-end.mp3' },
   hit: { enabled: true, volume: 1, src: '/sounds/hit.mp3' },
   miss: { enabled: true, volume: 0.85, src: '/sounds/miss.mp3' },
+}
+
+const DEFAULT_BATTLE_LAYOUT = {
+  mode: 'left-stacked',
+  boardZoom: 1,
 }
 
 export default function GamePage() {
@@ -66,6 +72,7 @@ export default function GamePage() {
   const [battleLog, setBattleLog] = useState([])
   const [showSoundMenu, setShowSoundMenu] = useState(false)
   const [soundSettings, setSoundSettings] = useState(DEFAULT_SOUND_SETTINGS)
+  const [battleLayout, setBattleLayout] = useState(DEFAULT_BATTLE_LAYOUT)
   const previousTurnRef = useRef(null)
   const pendingEffectTimeoutsRef = useRef([])
   const pendingEffectsUntilRef = useRef(0)
@@ -134,6 +141,26 @@ export default function GamePage() {
   useEffect(() => {
     localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(soundSettings))
   }, [soundSettings])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(BATTLE_LAYOUT_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      setBattleLayout({
+        mode: ['left-stacked', 'left-side-by-side', 'bottom-horizontal'].includes(parsed?.mode)
+          ? parsed.mode
+          : 'left-stacked',
+        boardZoom: Number.isFinite(Number(parsed?.boardZoom))
+          ? Math.min(1.8, Math.max(0.6, Number(parsed.boardZoom)))
+          : 1,
+      })
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem(BATTLE_LAYOUT_KEY, JSON.stringify(battleLayout))
+  }, [battleLayout])
 
   const updateSoundSettings = useCallback((next) => {
     setSoundSettings(prev => ({ ...prev, ...next }))
@@ -366,6 +393,77 @@ export default function GamePage() {
     return { positions: inBounds, invalid: inBounds.length !== raw.length }
   }, [targetingMode, linearHoverStart, selectedShip, linearDirection, boardSize])
 
+  const boardZoom = Number(battleLayout.boardZoom || 1)
+  const enemyBoardMaxPx = useMemo(() => {
+    const base = battleLayout.mode === 'left-stacked' ? 560 : 420
+    return Math.round(base * boardZoom)
+  }, [battleLayout.mode, boardZoom])
+  const ownBoardMaxPx = useMemo(() => {
+    const base = battleLayout.mode === 'left-stacked' ? 560 : 420
+    return Math.round(base * boardZoom)
+  }, [battleLayout.mode, boardZoom])
+  const isBottomHorizontalLayout = battleLayout.mode === 'bottom-horizontal'
+
+  const fleetAbilityPanel = (
+    <div style={{ background:'#1a2940', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'10px', padding:'14px', height:'100%', boxSizing:'border-box' }}>
+      <h3 style={{ color:'#64748b', fontSize:'0.72rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' }}>FLOTA I UMIEJĘTNOŚCI</h3>
+      <div style={{ display:'grid', gridTemplateColumns: isBottomHorizontalLayout ? 'minmax(0, 1.6fr) minmax(260px, 1fr)' : '1fr', gap:'14px', alignItems:'start' }}>
+        <FleetPanel fleet={myFleet} selectedShipIndex={selectedShipIndex} onSelectShip={setSelectedShipIndex} columns={isBottomHorizontalLayout ? 3 : 1} />
+
+        {selectedShip && (
+          <div style={{ marginTop:isBottomHorizontalLayout ? 0 : '12px', paddingTop:isBottomHorizontalLayout ? 0 : '12px', borderTop:isBottomHorizontalLayout ? 'none' : '1px solid rgba(255,255,255,0.08)', borderLeft:isBottomHorizontalLayout ? '1px solid rgba(255,255,255,0.08)' : 'none', paddingLeft:isBottomHorizontalLayout ? '14px' : 0 }}>
+          <div style={{ color:'#e2e8f0', fontSize:'0.95rem', fontWeight:700, marginBottom:'4px' }}>{selectedShip.name || `Statek ${selectedShipIndex + 1}`}</div>
+          <div style={{ color:'#94a3b8', fontSize:'0.8rem', marginBottom:'4px' }}>{selectedAbility.label}</div>
+          <div style={{ color:'#64748b', fontSize:'0.76rem', marginBottom:'10px' }}>Bazowy cooldown: {formatCooldownTurns(selectedAbility.cooldown)}</div>
+          <AbilityPanel
+            fleet={myFleet}
+            selectedShipIndex={selectedShipIndex}
+            onUseAbility={handleUseAbility}
+            isMyTurn={isMyTurn}
+            isTargeting={!!targetingMode}
+            onCancelTarget={() => setTargetingMode(null)}
+          />
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  const enemyBoardPanel = (
+    <div>
+      <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>
+        PLANSZA PRZECIWNIKA {targetingMode ? '— klikaj, aby wybierać cele' : isMyTurn ? '— kliknij, aby strzelić' : ''}
+      </h3>
+      {enemyBoard && (
+        <GameBoard
+          tiles={enemyBoard}
+          isOwnBoard={false}
+          onTileClick={handleEnemyClick}
+          onTileHover={(x, y) => {
+            if (targetingMode?.type === 'linear') setLinearHoverStart({ x, y })
+          }}
+          onTileLeave={() => {
+            if (targetingMode?.type === 'linear') setLinearHoverStart(null)
+          }}
+          boardSize={boardSize}
+          sonarPositions={enemySonarPositions}
+          targetPositions={pendingTargets}
+          previewPositions={targetingMode?.type === 'linear' ? linearPreview.positions : []}
+          previewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
+          isTargeting={!!targetingMode}
+          maxBoardPx={enemyBoardMaxPx}
+        />
+      )}
+    </div>
+  )
+
+  const myBoardPanel = (
+    <div>
+      <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>TWOJA PLANSZA</h3>
+      {myBoard && <GameBoard tiles={myBoard} isOwnBoard={true} boardSize={boardSize} sonarPositions={ownSonarPositions} maxBoardPx={ownBoardMaxPx} />}
+    </div>
+  )
+
   function handleEnemyClick(x, y) {
     if (targetingMode) {
       if (targetingMode.type === 'linear') {
@@ -496,6 +594,37 @@ export default function GamePage() {
         </span>
         <TurnTimer turnTimeLimit={turnTimeLimit || 60} turnStartedAt={turnStartedAt} />
         <div style={{ marginLeft: 'auto', display:'flex', gap:'8px', position: 'relative', alignItems:'center' }}>
+          <button
+            onClick={() => setBattleLayout(prev => ({ ...prev, mode: 'left-stacked' }))}
+            style={{ background:battleLayout.mode === 'left-stacked' ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.10)', color:'#6ee7b7', border:'1px solid rgba(16,185,129,0.35)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+          >
+            Układ 1
+          </button>
+          <button
+            onClick={() => setBattleLayout(prev => ({ ...prev, mode: 'left-side-by-side' }))}
+            style={{ background:battleLayout.mode === 'left-side-by-side' ? 'rgba(37,99,235,0.18)' : 'rgba(37,99,235,0.12)', color:'#93c5fd', border:'1px solid rgba(37,99,235,0.28)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+          >
+            Układ 2
+          </button>
+          <button
+            onClick={() => setBattleLayout(prev => ({ ...prev, mode: 'bottom-horizontal' }))}
+            style={{ background:battleLayout.mode === 'bottom-horizontal' ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)', color:'#a5b4fc', border:'1px solid rgba(99,102,241,0.28)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+          >
+            Układ 3
+          </button>
+          <button
+            onClick={() => setBattleLayout(prev => ({ ...prev, boardZoom: Math.max(0.6, Math.round((prev.boardZoom - 0.1) * 10) / 10) }))}
+            style={{ background:'rgba(255,255,255,0.06)', color:'#cbd5e1', border:'1px solid rgba(255,255,255,0.14)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+          >
+            −
+          </button>
+          <span style={{ color:'#94a3b8', fontSize:'0.78rem', minWidth:'52px', textAlign:'center' }}>{Math.round(boardZoom * 100)}%</span>
+          <button
+            onClick={() => setBattleLayout(prev => ({ ...prev, boardZoom: Math.min(1.8, Math.round((prev.boardZoom + 0.1) * 10) / 10) }))}
+            style={{ background:'rgba(255,255,255,0.06)', color:'#cbd5e1', border:'1px solid rgba(255,255,255,0.14)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+          >
+            +
+          </button>
           {!showSurrenderConfirm ? (
             <button
               onClick={() => setShowSurrenderConfirm(true)}
@@ -593,79 +722,40 @@ export default function GamePage() {
         </div>
       </div>
 
-      <div style={{ display:'flex', gap:'16px', flexWrap:'wrap', marginBottom:'16px' }}>
-        <div style={{ flex:1, minWidth:'280px' }}>
-          <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>TWOJA PLANSZA</h3>
-          {myBoard && <GameBoard tiles={myBoard} isOwnBoard={true} boardSize={boardSize} sonarPositions={ownSonarPositions} />}
-        </div>
-        <div style={{ flex:1, minWidth:'280px' }}>
-          <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>
-            PLANSZA PRZECIWNIKA {targetingMode ? '— klikaj, aby wybierać cele' : isMyTurn ? '— kliknij, aby strzelić' : ''}
-          </h3>
-          {enemyBoard && (
-            <GameBoard
-              tiles={enemyBoard}
-              isOwnBoard={false}
-              onTileClick={handleEnemyClick}
-              onTileHover={(x, y) => {
-                if (targetingMode?.type === 'linear') setLinearHoverStart({ x, y })
-              }}
-              onTileLeave={() => {
-                if (targetingMode?.type === 'linear') setLinearHoverStart(null)
-              }}
-              boardSize={boardSize}
-              sonarPositions={enemySonarPositions}
-              targetPositions={pendingTargets}
-              previewPositions={targetingMode?.type === 'linear' ? linearPreview.positions : []}
-              previewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
-              isTargeting={!!targetingMode}
-            />
-          )}
-        </div>
-      </div>
-
-      <div style={{ display:'flex', gap:'20px', flexWrap:'wrap' }}>
-        <div style={{ flex:1, minWidth:'260px', background:'#1a2940', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'10px', padding:'14px' }}>
-          <h3 style={{ color:'#64748b', fontSize:'0.72rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' }}>TWOJA FLOTA</h3>
-          <FleetPanel fleet={myFleet} selectedShipIndex={selectedShipIndex} onSelectShip={setSelectedShipIndex} />
-        </div>
-
-        {selectedShip && (
-          <div style={{ flex:1, minWidth:'280px', background:'#1a2940', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'10px', padding:'14px' }}>
-            <div style={{ color:'#64748b', fontSize:'0.72rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'10px' }}>AKTYWNA UMIEJĘTNOŚĆ</div>
-            <div style={{ color:'#e2e8f0', fontSize:'0.95rem', fontWeight:700, marginBottom:'4px' }}>{selectedShip.name || `Statek ${selectedShipIndex + 1}`}</div>
-            <div style={{ color:'#94a3b8', fontSize:'0.8rem', marginBottom:'4px' }}>{selectedAbility.label}</div>
-            <div style={{ color:'#64748b', fontSize:'0.76rem', marginBottom:'10px' }}>Bazowy cooldown: {formatCooldownTurns(selectedAbility.cooldown)}</div>
-            <AbilityPanel
-              fleet={myFleet}
-              selectedShipIndex={selectedShipIndex}
-              onUseAbility={handleUseAbility}
-              isMyTurn={isMyTurn}
-              isTargeting={!!targetingMode}
-              onCancelTarget={() => setTargetingMode(null)}
-            />
+      {battleLayout.mode === 'left-stacked' && (
+        <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+            {fleetAbilityPanel}
           </div>
-        )}
-      </div>
-
-      <div style={{ marginTop:'16px', background:'#1a2940', border:'1px solid rgba(255,255,255,0.07)', borderRadius:'10px', padding:'14px' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
-          <h3 style={{ color:'#64748b', fontSize:'0.72rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', margin:0 }}>Historia walki</h3>
-          <button onClick={() => setBattleLog([])} style={{ background:'rgba(255,255,255,0.05)', color:'#94a3b8', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'6px', padding:'4px 8px', cursor:'pointer', fontSize:'0.72rem' }}>Wyczysc</button>
-        </div>
-        {battleLog.length === 0 ? (
-          <div style={{ color:'#64748b', fontSize:'0.82rem' }}>Brak wpisow jeszcze.</div>
-        ) : (
-          <div style={{ maxHeight:'220px', overflowY:'auto', display:'flex', flexDirection:'column', gap:'6px' }}>
-            {battleLog.map(entry => (
-              <div key={entry.id} style={{ background:'#0f1923', border:'1px solid rgba(255,255,255,0.06)', borderRadius:'6px', padding:'7px 10px' }}>
-                <div style={{ color:'#475569', fontSize:'0.68rem', marginBottom:'2px' }}>{new Date(entry.ts).toLocaleTimeString()}</div>
-                <div style={{ color:'#cbd5e1', fontSize:'0.8rem', lineHeight:1.4 }}>{entry.message}</div>
-              </div>
-            ))}
+          <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+            {enemyBoardPanel}
+            {myBoardPanel}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {battleLayout.mode === 'left-side-by-side' && (
+        <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+            {fleetAbilityPanel}
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+            {enemyBoardPanel}
+            {myBoardPanel}
+          </div>
+        </div>
+      )}
+
+      {battleLayout.mode === 'bottom-horizontal' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+            {enemyBoardPanel}
+            {myBoardPanel}
+          </div>
+          {fleetAbilityPanel}
+        </div>
+      )}
+
     </div>
   )
 }

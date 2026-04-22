@@ -1,11 +1,29 @@
 import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 
-export default function FleetPanel({ fleet, selectedShipIndex, onSelectShip }) {
+export default function FleetPanel({ fleet, selectedShipIndex, onSelectShip, columns = 1 }) {
   if (!fleet || fleet.length === 0) return null
 
+  const orderedFleet = fleet
+    .map((ship, idx) => ({ ship, idx }))
+    .sort((a, b) => {
+      const aSunk = !!a.ship.isSunk
+      const bSunk = !!b.ship.isSunk
+      if (aSunk !== bSunk) return aSunk ? 1 : -1
+
+      if (aSunk && bSunk) return a.idx - b.idx
+
+      const aCd = Number(a.ship.cooldownRemaining || 0)
+      const bCd = Number(b.ship.cooldownRemaining || 0)
+      const aReady = aCd === 0
+      const bReady = bCd === 0
+      if (aReady !== bReady) return aReady ? -1 : 1
+      if (aCd !== bCd) return aCd - bCd
+      return a.idx - b.idx
+    })
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      {fleet.map((ship, idx) => {
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.max(1, columns)}, minmax(0, 1fr))`, gap: '8px' }}>
+      {orderedFleet.map(({ ship, idx }) => {
         const total = ship.positions?.length || 0
         const hits = Array.isArray(ship.hits) ? ship.hits.length : Number(ship.hits || 0)
         const hp = total > 0 ? Math.max(0, ((total - hits) / total) * 100) : 100

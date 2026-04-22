@@ -21,10 +21,12 @@ export default function GameBoard({
   previewPositions,
   previewInvalid,
   isTargeting,
+  maxBoardPx,
 }) {
   if (!tiles || !boardSize) return <div style={{ color: '#64748b', padding: '20px' }}>Loading board…</div>
 
-  const tileSize = Math.max(18, Math.min(38, Math.floor(480 / boardSize)))
+  const targetBoardPx = Number.isFinite(maxBoardPx) ? maxBoardPx : 480
+  const tileSize = Math.max(18, Math.min(96, Math.floor(targetBoardPx / boardSize)))
   const labelW = tileSize
 
   return (
