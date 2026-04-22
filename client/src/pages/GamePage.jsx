@@ -321,6 +321,15 @@ export default function GamePage() {
     clearPendingEffects()
   }, [gameId, clearPendingEffects])
 
+  const isMyTurn = turn === myId
+  const myBoard = myId ? boards[myId] : null
+  const enemyId = myId ? Object.keys(boards).find(id => id !== myId) : null
+  const enemyBoard = enemyId ? boards[enemyId] : null
+  const isGameOver = status === 'finished' || !!winnerId
+  const iWon = winnerId === myId
+  const selectedShip = myFleet?.[selectedShipIndex] || null
+  const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
+
   useEffect(() => {
     setEnemySonarPositions(prev => dropResolvedSonar(prev, enemyBoard))
   }, [enemyBoard, dropResolvedSonar])
@@ -338,14 +347,6 @@ export default function GamePage() {
     if (selectedShipIndex >= myFleet.length) setSelectedShipIndex(0)
   }, [myFleet, selectedShipIndex])
 
-  const isMyTurn = turn === myId
-  const myBoard = myId ? boards[myId] : null
-  const enemyId = myId ? Object.keys(boards).find(id => id !== myId) : null
-  const enemyBoard = enemyId ? boards[enemyId] : null
-  const isGameOver = status === 'finished' || !!winnerId
-  const iWon = winnerId === myId
-  const selectedShip = myFleet?.[selectedShipIndex] || null
-  const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
 
   const pendingTargets = useMemo(() => targetingMode?.targets || [], [targetingMode])
   const linearPreview = useMemo(() => {
