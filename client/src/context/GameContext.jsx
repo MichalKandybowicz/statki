@@ -1,8 +1,9 @@
-import { createContext, useState, useCallback, useEffect, useContext } from 'react'
+import { createContext, useState, useCallback, useEffect, useContext, useRef } from 'react'
 import { SocketContext } from './SocketContext.jsx'
 import { AuthContext } from './AuthContext.jsx'
 
 export const GameContext = createContext(null)
+const ABILITY_REVEAL_STEP_MS = 1000
 
 export function GameProvider({ children }) {
   const socket = useContext(SocketContext)
@@ -19,8 +20,15 @@ export function GameProvider({ children }) {
   const [winnerId, setWinnerId] = useState(null)
   const [players, setPlayers] = useState([])
   const [skips, setSkips] = useState({})
+  const pendingAbilityTimeoutsRef = useRef([])
+
+  const clearPendingAbilityEffects = useCallback(() => {
+    pendingAbilityTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId))
+    pendingAbilityTimeoutsRef.current = []
+  }, [])
 
   const setGameData = useCallback((data) => {
+    clearPendingAbilityEffects()
     if (data.gameId) setGameId(data.gameId)
     if (data.boardSize) setBoardSize(data.boardSize)
     if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
@@ -38,9 +46,10 @@ export function GameProvider({ children }) {
     if (data.winnerId !== undefined) setWinnerId(data.winnerId)
     if (data.players) setPlayers(data.players)
     if (data.skips) setSkips(data.skips)
-  }, [])
+  }, [clearPendingAbilityEffects])
 
   const clearGame = useCallback(() => {
+    clearPendingAbilityEffects()
     setGameId(null)
     setBoardSize(10)
     setTurnTimeLimit(60)
@@ -52,7 +61,7 @@ export function GameProvider({ children }) {
     setWinnerId(null)
     setPlayers([])
     setSkips({})
-  }, [])
+  }, [clearPendingAbilityEffects])
 
   useEffect(() => {
     if (!socket) return
@@ -66,6 +75,7 @@ export function GameProvider({ children }) {
     }
 
     const handleGameStart = (data) => {
+      clearPendingAbilityEffects()
       setGameId(data.gameId)
       setBoardSize(data.boardSize)
       if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
@@ -79,6 +89,7 @@ export function GameProvider({ children }) {
     }
 
     const handleGameState = (data) => {
+      clearPendingAbilityEffects()
       if (data.gameId) setGameId(data.gameId)
       if (data.boardSize) setBoardSize(data.boardSize)
       if (data.turnTimeLimit) setTurnTimeLimit(data.turnTimeLimit)
@@ -94,6 +105,7 @@ export function GameProvider({ children }) {
 
     const handleMoveResult = ({ playerId, x, y, hit, sunk, boards: payloadBoards, fleet }) => {
       if (!user) return
+      clearPendingAbilityEffects()
       if (payloadBoards) setBoards(normaliseBoardData(payloadBoards))
       if (fleet) setMyFleet(fleet)
 
@@ -115,25 +127,45 @@ export function GameProvider({ children }) {
     }
 
     const handleAbilityResult = ({ results, playerId, boards: payloadBoards, fleet }) => {
-      if (!user || !results) return
-      if (payloadBoards) setBoards(normaliseBoardData(payloadBoards))
+      if (!user) return
+      const shots = Array.isArray(results) ? results : []
       if (fleet) setMyFleet(fleet)
 
-      if (payloadBoards) return
+      if (shots.length === 0) {
+        if (payloadBoards) setBoards(normaliseBoardData(payloadBoards))
+        return
+      }
 
-      setBoards(prev => {
-        const targetId = playerId === user._id
-          ? Object.keys(prev).find(id => id !== user._id)
-          : user._id
+      clearPendingAbilityEffects()
 
-        if (!targetId || !prev[targetId]) return prev
+      const applyShotToBoard = ({ x, y, hit, sunk }) => {
+        setBoards(prev => {
+          const targetId = playerId === user._id
+            ? Object.keys(prev).find(id => id !== user._id)
+            : user._id
 
-        const board = prev[targetId].map(row => [...row])
-        results.forEach(({ x, y, hit, sunk }) => {
+          if (!targetId || !prev[targetId]) return prev
+          if (!prev[targetId][y] || prev[targetId][y][x] === undefined) return prev
+
+          const board = prev[targetId].map(row => [...row])
           board[y][x] = sunk ? 'sunk' : hit ? 'hit' : 'miss'
+          return { ...prev, [targetId]: board }
         })
-        return { ...prev, [targetId]: board }
+      }
+
+      shots.forEach((shot, index) => {
+        const timeoutId = setTimeout(() => {
+          applyShotToBoard(shot)
+        }, index * ABILITY_REVEAL_STEP_MS)
+        pendingAbilityTimeoutsRef.current.push(timeoutId)
       })
+
+      if (payloadBoards) {
+        const syncTimeoutId = setTimeout(() => {
+          setBoards(normaliseBoardData(payloadBoards))
+        }, shots.length * ABILITY_REVEAL_STEP_MS + 10)
+        pendingAbilityTimeoutsRef.current.push(syncTimeoutId)
+      }
     }
 
     const handleTurnUpdate = ({ turn: newTurn, turnStartedAt: newTsa, skips: newSkips, fleet }) => {
@@ -144,6 +176,7 @@ export function GameProvider({ children }) {
     }
 
     const handleGameOver = ({ winnerId: wid }) => {
+      clearPendingAbilityEffects()
       setWinnerId(wid)
       setStatus('finished')
     }
@@ -156,6 +189,7 @@ export function GameProvider({ children }) {
     socket.on('game_over', handleGameOver)
 
     return () => {
+      clearPendingAbilityEffects()
       socket.off('game_start', handleGameStart)
       socket.off('game_state', handleGameState)
       socket.off('move_result', handleMoveResult)
@@ -163,7 +197,7 @@ export function GameProvider({ children }) {
       socket.off('turn_update', handleTurnUpdate)
       socket.off('game_over', handleGameOver)
     }
-  }, [socket, user])
+  }, [socket, user, clearPendingAbilityEffects])
 
   return (
     <GameContext.Provider value={{

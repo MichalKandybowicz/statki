@@ -393,6 +393,22 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
             positions: sonarResult.positions || [],
             fleet: game.fleets.get(userId) || [],
           });
+
+          for (const pid of game.players) {
+            const pidStr = pid.toString();
+            emitToUser(io, connectedUsers, pidStr, 'ability_result', {
+              abilityType: 'sonar',
+              results: [],
+              shipIndex,
+              playerId: userId,
+              origin: sonarResult.origin || null,
+              foundCount: Array.isArray(sonarResult.positions) ? sonarResult.positions.length : 0,
+              positions: sonarResult.positions || [],
+              boards: getPlayerView(game, pidStr),
+              fleet: game.fleets.get(pidStr) || [],
+            });
+          }
+
           emitTurnUpdateToPlayers(io, connectedUsers, game, nextPlayerId);
           return;
         }
@@ -411,6 +427,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         for (const pid of game.players) {
           const pidStr = pid.toString();
           emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
+            abilityType: ship.abilityType,
             results,
             shipIndex,
             playerId: userId,
@@ -432,6 +449,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       for (const pid of game.players) {
         const pidStr = pid.toString();
         emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
+          abilityType: ship.abilityType,
           results,
           shipIndex,
           playerId: userId,

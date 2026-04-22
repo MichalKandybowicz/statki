@@ -47,9 +47,8 @@ export default function GameBoard({
               const isTargeted = targetPositions?.some(p => p.x === c && p.y === r)
               const isPreview = previewPositions?.some(p => p.x === c && p.y === r)
               const displayTile = (!isOwnBoard && tile === 'ship') ? 'water' : tile
-              const bg = isSonar
-                ? '#14532d'
-                : isTargeted
+              const sonarVisible = isSonar && displayTile !== 'hit' && displayTile !== 'miss' && displayTile !== 'sunk'
+              const bg = isTargeted
                   ? '#7c2d12'
                   : isPreview
                     ? (previewInvalid ? 'rgba(239,68,68,0.5)' : 'rgba(34,197,94,0.5)')
@@ -67,7 +66,7 @@ export default function GameBoard({
                     width: `${tileSize}px`,
                     height: `${tileSize}px`,
                     background: bg,
-                    border: isSonar
+                    border: sonarVisible
                       ? '1px solid #22c55e'
                       : isTargeted
                         ? '1px solid #fb923c'
