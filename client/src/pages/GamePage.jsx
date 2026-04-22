@@ -9,25 +9,6 @@ import AbilityPanel from '../components/game/AbilityPanel.jsx'
 import TurnTimer from '../components/game/TurnTimer.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
 
-const directionBtnStyle = {
-  background: 'rgba(37,99,235,0.15)',
-  color: '#60a5fa',
-  border: '1px solid rgba(37,99,235,0.25)',
-  borderRadius: '5px',
-  padding: '4px 10px',
-  cursor: 'pointer',
-  fontSize: '0.78rem',
-}
-
-const confirmBtnStyle = {
-  background: 'rgba(34,197,94,0.15)',
-  color: '#4ade80',
-  border: '1px solid rgba(34,197,94,0.25)',
-  borderRadius: '5px',
-  padding: '3px 10px',
-  fontSize: '0.78rem',
-}
-
 const SOUND_SETTINGS_KEY = 'statki:sound-settings:v1'
 const BATTLE_LAYOUT_KEY = 'statki:battle-layout:v1'
 const ABILITY_REVEAL_STEP_MS = 1000
@@ -39,7 +20,7 @@ const DEFAULT_SOUND_SETTINGS = {
 }
 
 const DEFAULT_BATTLE_LAYOUT = {
-  mode: 'left-stacked',
+  mode: 'bottom-horizontal',
   boardZoom: 1,
 }
 
@@ -150,7 +131,7 @@ export default function GamePage() {
       setBattleLayout({
         mode: ['left-stacked', 'left-side-by-side', 'bottom-horizontal'].includes(parsed?.mode)
           ? parsed.mode
-          : 'left-stacked',
+          : 'bottom-horizontal',
         boardZoom: Number.isFinite(Number(parsed?.boardZoom))
           ? Math.min(1.8, Math.max(0.6, Number(parsed.boardZoom)))
           : 1,
@@ -421,7 +402,12 @@ export default function GamePage() {
             onUseAbility={handleUseAbility}
             isMyTurn={isMyTurn}
             isTargeting={!!targetingMode}
-            onCancelTarget={() => setTargetingMode(null)}
+            onCancelTarget={() => { setTargetingMode(null); setLinearHoverStart(null) }}
+            targetingMode={targetingMode}
+            linearDirection={linearDirection}
+            onSetLinearDirection={setLinearDirection}
+            onConfirmTarget={confirmTargetAbility}
+            linearPreviewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
           />
           </div>
         )}
@@ -556,35 +542,6 @@ export default function GamePage() {
         <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#f87171', padding:'8px 14px', borderRadius:'8px', marginBottom:'12px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.85rem' }}>
           {error}
           <button onClick={() => setError('')} style={{ background:'none', border:'none', color:'#f87171', cursor:'pointer' }}>✕</button>
-        </div>
-      )}
-
-      {targetingMode && (
-        <div style={{ background:'rgba(245,158,11,0.08)', border:'1px solid rgba(245,158,11,0.25)', color:'#fbbf24', padding:'8px 14px', borderRadius:'8px', marginBottom:'12px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'0.85rem' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' }}>
-            <span>
-              🎯 {selectedShip?.name || `Statek ${targetingMode.shipIndex + 1}`} — {targetingMode.type === 'linear'
-                ? `kliknij początek salwy (${linearDirection === 'horizontal' ? 'poziomo' : 'pionowo'}, długość ${selectedShip?.positions?.length || 1})`
-                : targetingMode.type === 'sonar'
-                  ? 'kliknij pole, z którego ma pójść impuls sonaru'
-                : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
-            </span>
-            {targetingMode.type === 'linear' && linearPreview.invalid && (
-              <span style={{ color: '#f87171' }}>Linia wychodzi poza planszę</span>
-            )}
-            {targetingMode.type === 'linear' && (
-              <div style={{ display:'flex', gap:'6px' }}>
-                <button onClick={() => setLinearDirection('horizontal')} style={{ ...directionBtnStyle, opacity: linearDirection === 'horizontal' ? 1 : 0.6 }}>Poziomo</button>
-                <button onClick={() => setLinearDirection('vertical')} style={{ ...directionBtnStyle, opacity: linearDirection === 'vertical' ? 1 : 0.6 }}>Pionowo</button>
-              </div>
-            )}
-          </div>
-          <div style={{ display:'flex', gap:'8px' }}>
-            {targetingMode.type === 'target' && (
-              <button onClick={confirmTargetAbility} disabled={targetingMode.targets.length === 0} style={{ ...confirmBtnStyle, opacity: targetingMode.targets.length > 0 ? 1 : 0.5, cursor: targetingMode.targets.length > 0 ? 'pointer' : 'not-allowed' }}>Zatwierdź</button>
-            )}
-            <button onClick={() => { setTargetingMode(null); setLinearHoverStart(null) }} style={{ background:'rgba(239,68,68,0.15)', color:'#f87171', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Anuluj</button>
-          </div>
         </div>
       )}
 
