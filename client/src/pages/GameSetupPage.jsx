@@ -23,6 +23,8 @@ export default function GameSetupPage() {
   const [myBoards, setMyBoards] = useState([])
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [changingMap, setChangingMap] = useState(false)
+  const [myFleet, setMyFleet] = useState([])
+  const [shipLimitInput, setShipLimitInput] = useState(5)
 
   useEffect(() => {
     roomsApi.get(roomId)
@@ -69,6 +71,11 @@ export default function GameSetupPage() {
     }
     const onRoomUpdate = (updatedRoom) => {
       setRoom(updatedRoom)
+      setShipLimitInput(updatedRoom.settings?.shipLimit || 5)
+      // Restore staged fleet if available
+      if (updatedRoom.stagedFleets && updatedRoom.stagedFleets[user?._id]) {
+        setMyFleet(updatedRoom.stagedFleets[user?._id])
+      }
       setStartingGame(false)
       setChangingMap(false)
     }
@@ -95,11 +102,19 @@ export default function GameSetupPage() {
       socket.off('error', onError)
       socket.off('map_changed', onMapChanged)
     }
-  }, [socket, roomId, navigate, setGameData])
+  }, [socket, roomId, navigate, setGameData, user?._id])
 
   const boardSize = room?.settings?.boardSize || 10
   const shipLimit = room?.settings?.shipLimit || 5
   const tiles = boardTiles || createEmptyBoard(boardSize)
+
+  const convertedFleet = useMemo(
+    () => myFleet.map(ship => ({
+      shipTemplateId: ship.shipTemplateId,
+      cells: ship.positions?.map(pos => ({ r: pos.y, c: pos.x })) || [],
+    })),
+    [myFleet]
+  )
 
   const uniquePlayers = useMemo(() => {
     const map = new Map()
@@ -141,6 +156,18 @@ export default function GameSetupPage() {
     socket.emit('change_map', { roomId, boardTemplateId })
   }
 
+  function handleNotReady() {
+    if (!socket) return
+    setError('')
+    socket.emit('player_not_ready', { roomId })
+  }
+
+  function handleChangeShipLimit(newLimit) {
+    if (!socket) return
+    setError('')
+    socket.emit('change_ship_limit', { roomId, shipLimit: newLimit })
+  }
+
   return (
     <div style={{ maxWidth:'1200px', margin:'0 auto', padding:'32px 20px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', gap:'20px', alignItems:'flex-start', flexWrap:'wrap', marginBottom:'20px' }}>
@@ -163,54 +190,117 @@ export default function GameSetupPage() {
             {uniquePlayers.map((player, idx) => {
               const playerId = (player.userId?._id || player.userId)?.toString()
               const isPlayerHost = playerId === (room?.hostId?._id || room?.hostId)?.toString()
+              const isCurrentPlayer = playerId === user?._id?.toString()
               return (
-                <div key={playerId || idx} style={playerRowStyle}>
-                  <div>
-                    <div style={{ color:'#e2e8f0', fontSize:'0.9rem', fontWeight:600 }}>
-                      {player.userId?.username || player.userId?.email?.split('@')[0] || `Gracz ${idx + 1}`}
-                      {isPlayerHost && <span style={hostBadgeStyle}>HOST</span>}
-                      {playerId === user?._id?.toString() && <span style={meBadgeStyle}>TY</span>}
+                <div key={playerId || idx}>
+                  <div style={playerRowStyle}>
+                    <div>
+                      <div style={{ color:'#e2e8f0', fontSize:'0.9rem', fontWeight:600 }}>
+                        {player.userId?.username || player.userId?.email?.split('@')[0] || `Gracz ${idx + 1}`}
+                        {isPlayerHost && <span style={hostBadgeStyle}>HOST</span>}
+                        {isCurrentPlayer && <span style={meBadgeStyle}>TY</span>}
+                      </div>
                     </div>
+                    <span style={{ color: player.ready ? '#4ade80' : '#f59e0b', fontSize:'0.8rem', fontWeight:700 }}>
+                      {player.ready ? 'GOTOWY' : 'CZEKA'}
+                    </span>
                   </div>
-                  <span style={{ color: player.ready ? '#4ade80' : '#f59e0b', fontSize:'0.8rem', fontWeight:700 }}>
-                    {player.ready ? 'GOTOWY' : 'CZEKA'}
-                  </span>
+                  {isCurrentPlayer && player.ready && (
+                    <button
+                      onClick={handleNotReady}
+                      style={{
+                        marginTop: '6px',
+                        width: '100%',
+                        background: 'rgba(239,68,68,0.12)',
+                        color: '#f87171',
+                        border: '1px solid rgba(239,68,68,0.25)',
+                        borderRadius: '6px',
+                        padding: '6px 10px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ← Wycofaj gotowość
+                    </button>
+                  )}
                 </div>
               )
             })}
           </div>
 
-          {isHost ? (
-            <>
-              <button
-                onClick={handleStartGame}
-                disabled={!canStartGame || startingGame}
-                style={{
-                  ...startBtnStyle,
-                  opacity: canStartGame && !startingGame ? 1 : 0.45,
-                  cursor: canStartGame && !startingGame ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {startingGame ? 'Uruchamianie…' : 'Start gry'}
-              </button>
-              <button
-                onClick={() => setShowMapPicker(p => !p)}
-                style={{
-                  marginTop: '8px',
-                  width: '100%',
-                  background: 'rgba(37,99,235,0.12)',
-                  color: '#60a5fa',
-                  border: '1px solid rgba(37,99,235,0.25)',
-                  borderRadius: '8px',
-                  padding: '8px 14px',
-                  fontSize: '0.85rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                }}
-              >
-                {showMapPicker ? 'Ukryj wybór mapy' : '🗺 Zmień mapę'}
-              </button>
-              {showMapPicker && (
+           {isHost ? (
+             <>
+               <button
+                 onClick={handleStartGame}
+                 disabled={!canStartGame || startingGame}
+                 style={{
+                   ...startBtnStyle,
+                   opacity: canStartGame && !startingGame ? 1 : 0.45,
+                   cursor: canStartGame && !startingGame ? 'pointer' : 'not-allowed',
+                 }}
+               >
+                 {startingGame ? 'Uruchamianie…' : 'Start gry'}
+               </button>
+
+               <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
+                 <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
+                   Liczba statków:
+                 </label>
+                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                   <input
+                     type="number"
+                     min="1"
+                     max="10"
+                     value={shipLimitInput}
+                     onChange={(e) => setShipLimitInput(Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
+                     style={{
+                       flex: 1,
+                       background: 'rgba(255,255,255,0.05)',
+                       color: '#e2e8f0',
+                       border: '1px solid rgba(255,255,255,0.15)',
+                       borderRadius: '6px',
+                       padding: '6px 8px',
+                       fontSize: '0.85rem',
+                     }}
+                   />
+                   <button
+                     onClick={() => handleChangeShipLimit(shipLimitInput)}
+                     disabled={shipLimitInput === room?.settings?.shipLimit}
+                     style={{
+                       background: shipLimitInput !== room?.settings?.shipLimit ? 'rgba(37,99,235,0.2)' : 'rgba(200,200,200,0.1)',
+                       color: shipLimitInput !== room?.settings?.shipLimit ? '#60a5fa' : '#888',
+                       border: shipLimitInput !== room?.settings?.shipLimit ? '1px solid rgba(37,99,235,0.4)' : '1px solid rgba(200,200,200,0.2)',
+                       borderRadius: '6px',
+                       padding: '6px 12px',
+                       fontSize: '0.75rem',
+                       fontWeight: 600,
+                       cursor: shipLimitInput !== room?.settings?.shipLimit ? 'pointer' : 'default',
+                     }}
+                   >
+                     Zmień
+                   </button>
+                 </div>
+               </div>
+
+               <button
+                 onClick={() => setShowMapPicker(p => !p)}
+                 style={{
+                   marginTop: '8px',
+                   width: '100%',
+                   background: 'rgba(37,99,235,0.12)',
+                   color: '#60a5fa',
+                   border: '1px solid rgba(37,99,235,0.25)',
+                   borderRadius: '8px',
+                   padding: '8px 14px',
+                   fontSize: '0.85rem',
+                   fontWeight: 600,
+                   cursor: 'pointer',
+                 }}
+               >
+                 {showMapPicker ? 'Ukryj wybór mapy' : '🗺 Zmień mapę'}
+               </button>
+               {showMapPicker && (
                 <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
                   {myBoards.length === 0 ? (
                     <p style={{ color: '#64748b', fontSize: '0.8rem', margin: 0 }}>Brak dostępnych map.</p>
@@ -272,6 +362,7 @@ export default function GameSetupPage() {
           boardTiles={tiles}
           availableShips={ships}
           shipLimit={shipLimit}
+          initialFleet={convertedFleet}
           onFleetReady={fleet => {
             setError('')
             socket?.emit('place_fleet', { roomId, fleet })

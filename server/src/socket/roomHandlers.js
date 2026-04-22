@@ -146,8 +146,78 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
     }
   });
 
-  // change_map: host changes board template before game starts
-  socket.on('change_map', async ({ roomId, boardTemplateId } = {}) => {
+   // player_not_ready: player retracts ready status
+   socket.on('player_not_ready', async ({ roomId } = {}) => {
+     try {
+       if (!roomId) {
+         return socket.emit('error', { message: 'roomId is required' });
+       }
+
+       const room = await Room.findById(roomId);
+       if (!room) return socket.emit('error', { message: 'Room not found' });
+       await ensureUniqueRoomPlayers(room);
+       if (room.status !== 'waiting' && room.status !== 'setup') {
+         return socket.emit('error', { message: 'Room is not in a ready-able state' });
+       }
+
+       const player = room.players.find((p) => getPlayerUserId(p) === userId);
+       if (!player) return socket.emit('error', { message: 'Not in this room' });
+
+       player.ready = false;
+       await room.save();
+       await room.populate('hostId', 'email username');
+       await room.populate('players.userId', 'email username');
+
+       const safeRoom = toSafeRoom(room);
+
+       io.to(`room:${roomId}`).emit('room_update', safeRoom);
+     } catch (err) {
+       console.error('player_not_ready error:', err);
+       socket.emit('error', { message: 'Failed to unset ready' });
+     }
+   });
+
+   // change_ship_limit: host changes ship limit before game starts
+   socket.on('change_ship_limit', async ({ roomId, shipLimit } = {}) => {
+     try {
+       if (!roomId || shipLimit === undefined) {
+         return socket.emit('error', { message: 'roomId and shipLimit are required' });
+       }
+
+       const room = await Room.findById(roomId);
+       if (!room) return socket.emit('error', { message: 'Room not found' });
+       await ensureUniqueRoomPlayers(room);
+
+       if (room.hostId.toString() !== userId) {
+         return socket.emit('error', { message: 'Only the host can change ship limit' });
+       }
+       if (room.status !== 'waiting' && room.status !== 'setup') {
+         return socket.emit('error', { message: 'Cannot change ship limit after game has started' });
+       }
+
+       // Validate ship limit
+       const newLimit = parseInt(shipLimit, 10);
+       if (isNaN(newLimit) || newLimit < 1 || newLimit > 10) {
+         return socket.emit('error', { message: 'Ship limit must be between 1 and 10' });
+       }
+
+       room.settings.shipLimit = newLimit;
+       // reset ready state so players adjust their fleet to new limit
+       room.players.forEach(p => { p.ready = false; });
+       await room.save();
+
+       await room.populate('hostId', 'email username');
+       await room.populate('players.userId', 'email username');
+
+       io.to(`room:${roomId}`).emit('room_update', toSafeRoom(room));
+     } catch (err) {
+       console.error('change_ship_limit error:', err);
+       socket.emit('error', { message: 'Failed to change ship limit' });
+     }
+   });
+
+   // change_map: host changes board template before game starts
+   socket.on('change_map', async ({ roomId, boardTemplateId } = {}) => {
     try {
       if (!roomId || !boardTemplateId) {
         return socket.emit('error', { message: 'roomId and boardTemplateId are required' });

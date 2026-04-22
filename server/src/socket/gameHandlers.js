@@ -206,30 +206,37 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         return socket.emit('error', { message: placementResult.error });
       }
 
-      // Stage fleet
-      if (!stagedFleets.has(roomId)) {
-        stagedFleets.set(roomId, new Map());
-      }
-      stagedFleets.get(roomId).set(userId, resolvedFleet);
+       // Stage fleet
+       if (!stagedFleets.has(roomId)) {
+         stagedFleets.set(roomId, new Map());
+       }
+       stagedFleets.get(roomId).set(userId, resolvedFleet);
 
-      // Move room to setup if still waiting
-      if (room.status === 'waiting') {
-        room.status = 'setup';
-      }
-      const player = room.players.find((p) => getPlayerUserId(p) === userId);
-      if (player) player.ready = true;
-      await room.save();
+       // Move room to setup if still waiting
+       if (room.status === 'waiting') {
+         room.status = 'setup';
+       }
+       const player = room.players.find((p) => getPlayerUserId(p) === userId);
+       if (player) player.ready = true;
+       await room.save();
 
-      await room.populate('hostId', 'email username');
-      await room.populate('players.userId', 'email username');
+       await room.populate('hostId', 'email username');
+       await room.populate('players.userId', 'email username');
 
-      socket.emit('fleet_accepted', { message: 'Fleet placement accepted' });
+       socket.emit('fleet_accepted', { message: 'Fleet placement accepted' });
 
-      io.to(`room:${roomId}`).emit('room_update', {
-        ...room.toObject(),
-        hasPassword: !!room.settings.password,
-        settings: { ...room.settings.toObject(), password: undefined },
-      });
+       // Include staged fleets in room update for all players to see fleet status
+       const roomFleets = stagedFleets.get(roomId) || new Map();
+       const fleetsData = Object.fromEntries(
+         Array.from(roomFleets.entries()).map(([uid, fleet]) => [uid, fleet])
+       );
+
+       io.to(`room:${roomId}`).emit('room_update', {
+         ...room.toObject(),
+         hasPassword: !!room.settings.password,
+         settings: { ...room.settings.toObject(), password: undefined },
+         stagedFleets: fleetsData,
+       });
     } catch (err) {
       console.error('place_fleet error:', err);
       socket.emit('error', { message: 'Failed to place fleet' });

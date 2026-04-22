@@ -29,10 +29,10 @@ function tileColor(tile) {
   }
 }
 
-export default function FleetPlacer({ boardSize, boardTiles, availableShips, shipLimit = 5, onFleetReady }) {
+export default function FleetPlacer({ boardSize, boardTiles, availableShips, shipLimit = 5, onFleetReady, initialFleet = [] }) {
   // Base board (rocks from template, no ships)
   const [baseTiles, setBaseTiles] = useState(() => boardTiles?.map(r => [...r]) || [])
-  const [placedShips, setPlacedShips] = useState([])
+  const [placedShips, setPlacedShips] = useState(() => initialFleet.length > 0 ? initialFleet : [])
   const [selectedShip, setSelectedShip] = useState(null)
   const [rotation, setRotation] = useState(0)
   const [hoverCell, setHoverCell] = useState(null)
@@ -41,6 +41,13 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
   useEffect(() => {
     if (boardTiles) setBaseTiles(boardTiles.map(r => [...r]))
   }, [boardTiles])
+
+  // Synchronize initialFleet when it changes (e.g., after getting it from server)
+  useEffect(() => {
+    if (initialFleet.length > 0) {
+      setPlacedShips(initialFleet)
+    }
+  }, [initialFleet])
 
   // R key: rotate selected/dragged ship
   useEffect(() => {
@@ -152,6 +159,13 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
 
   return (
     <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+      <ShipSelector
+        ships={availableShips}
+        onSelect={ship => { setSelectedShip(ship); setHoverCell(null) }}
+        selectedShip={selectedShip}
+        onDragStart={handleShipDragStart}
+      />
+
       <div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
           <button
@@ -210,13 +224,6 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
           )}
         </div>
       </div>
-
-      <ShipSelector
-        ships={availableShips}
-        onSelect={ship => { setSelectedShip(ship); setHoverCell(null) }}
-        selectedShip={selectedShip}
-        onDragStart={handleShipDragStart}
-      />
     </div>
   )
 }
