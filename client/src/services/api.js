@@ -94,7 +94,7 @@ export const rooms = {
 
 export const ships = {
   list: () => axiosInstance.get('/ships'),
-  listCommunity: () => axiosInstance.get('/ships/community'),
+  listCommunity: (params = {}) => axiosInstance.get('/ships/community', { params }),
   create: (data) => axiosInstance.post('/ships', data),
   update: (id, data) => axiosInstance.put(`/ships/${id}`, data),
   delete: (id) => axiosInstance.delete(`/ships/${id}`),

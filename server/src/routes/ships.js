@@ -52,6 +52,10 @@ function validateAbilityForSize(abilityType, size) {
   return null;
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // GET /api/ships
 router.get('/', async (req, res) => {
   try {
@@ -66,7 +70,30 @@ router.get('/', async (req, res) => {
 // GET /api/ships/community
 router.get('/community', async (req, res) => {
   try {
-    const ships = await ShipTemplate.find()
+    const { abilityType, name, size } = req.query;
+    const validAbilities = ['linear', 'random', 'target', 'sonar'];
+
+    const query = {
+      ownerId: { $ne: req.user._id },
+    };
+
+    if (typeof abilityType === 'string' && validAbilities.includes(abilityType)) {
+      query.abilityType = abilityType;
+    }
+
+    if (typeof name === 'string' && name.trim()) {
+      query.name = { $regex: escapeRegex(name.trim()), $options: 'i' };
+    }
+
+    if (size !== undefined && size !== null && size !== '') {
+      const parsedSize = Number(size);
+      if (!Number.isInteger(parsedSize) || parsedSize < 1 || parsedSize > 7) {
+        return res.status(400).json({ error: 'size must be an integer between 1 and 7' });
+      }
+      query.size = parsedSize;
+    }
+
+    const ships = await ShipTemplate.find(query)
       .populate('ownerId', 'email username')
       .sort({ _id: -1 })
       .lean();
@@ -76,6 +103,7 @@ router.get('/community', async (req, res) => {
         ...ship,
         owner: {
           _id: ship.ownerId?._id,
+          username: ship.ownerId?.username,
           email: ship.ownerId?.email,
         },
         isOwn: ship.ownerId?._id?.toString() === req.user._id.toString(),

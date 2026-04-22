@@ -14,6 +14,11 @@ export default function ShipBuilderPage() {
   const [abilityType, setAbilityType] = useState('linear')
   const [savedShips, setSavedShips] = useState([])
   const [communityShips, setCommunityShips] = useState([])
+  const [communityFilters, setCommunityFilters] = useState({
+    name: '',
+    abilityType: 'all',
+    size: 'all',
+  })
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [copyingShipId, setCopyingShipId] = useState(null)
@@ -21,8 +26,11 @@ export default function ShipBuilderPage() {
 
   useEffect(() => {
     loadShips()
-    loadCommunityShips()
   }, [])
+
+  useEffect(() => {
+    loadCommunityShips()
+  }, [communityFilters])
 
   async function loadShips() {
     try {
@@ -33,8 +41,15 @@ export default function ShipBuilderPage() {
 
   async function loadCommunityShips() {
     try {
-      const res = await shipsApi.listCommunity()
-      setCommunityShips(res.data || [])
+      const params = {}
+      if (communityFilters.name.trim()) params.name = communityFilters.name.trim()
+      if (communityFilters.abilityType !== 'all') params.abilityType = communityFilters.abilityType
+      if (communityFilters.size !== 'all') params.size = Number(communityFilters.size)
+
+      const res = await shipsApi.listCommunity(params)
+      const ships = Array.isArray(res.data) ? res.data : []
+      // Endpoint już filtruje ownerId, ale zostawiamy bezpiecznik po stronie UI.
+      setCommunityShips(ships.filter(ship => !ship.isOwn))
     } catch {
       setCommunityShips([])
     }
@@ -240,6 +255,42 @@ export default function ShipBuilderPage() {
           )}
 
           <h2 style={{ color: '#e2e8f0', fontSize: '1.1rem', marginTop: '26px', marginBottom: '14px' }}>Wszystkie statki w grze ({communityShips.length})</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(140px, 1fr) minmax(140px, 1fr)', gap: '8px', marginBottom: '10px' }}>
+            <input
+              value={communityFilters.name}
+              onChange={e => setCommunityFilters(prev => ({ ...prev, name: e.target.value }))}
+              placeholder="Szukaj po nazwie"
+              style={inp}
+            />
+            <select
+              value={communityFilters.abilityType}
+              onChange={e => setCommunityFilters(prev => ({ ...prev, abilityType: e.target.value }))}
+              style={inp}
+            >
+              <option value="all">Wszystkie zdolności</option>
+              <option value="linear">Liniowy strzał</option>
+              <option value="random">Losowy ostrzał</option>
+              <option value="target">Atak obszarowy</option>
+              <option value="sonar">Sonar</option>
+            </select>
+            <select
+              value={communityFilters.size}
+              onChange={e => setCommunityFilters(prev => ({ ...prev, size: e.target.value }))}
+              style={inp}
+            >
+              <option value="all">Każdy rozmiar</option>
+              {Array.from({ length: 7 }).map((_, idx) => (
+                <option key={idx + 1} value={idx + 1}>Rozmiar {idx + 1}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setCommunityFilters({ name: '', abilityType: 'all', size: 'all' })}
+              style={secondaryBtnStyle}
+            >
+              Wyczyść filtry
+            </button>
+          </div>
           {communityShips.length === 0 ? (
             <p style={{ color: '#64748b' }}>Brak statków do wyświetlenia.</p>
           ) : (
