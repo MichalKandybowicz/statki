@@ -20,6 +20,9 @@ export default function GameSetupPage() {
   const [error, setError] = useState('')
   const [boardLoading, setBoardLoading] = useState(true)
   const [startingGame, setStartingGame] = useState(false)
+  const [myBoards, setMyBoards] = useState([])
+  const [showMapPicker, setShowMapPicker] = useState(false)
+  const [changingMap, setChangingMap] = useState(false)
 
   useEffect(() => {
     roomsApi.get(roomId)
@@ -29,6 +32,10 @@ export default function GameSetupPage() {
     shipsApi.list()
       .then(res => setShips(res.data || []))
       .catch(() => setShips([]))
+
+    boardsApi.list()
+      .then(res => setMyBoards(res.data || []))
+      .catch(() => setMyBoards([]))
   }, [roomId])
 
   useEffect(() => {
@@ -63,22 +70,30 @@ export default function GameSetupPage() {
     const onRoomUpdate = (updatedRoom) => {
       setRoom(updatedRoom)
       setStartingGame(false)
+      setChangingMap(false)
     }
     const onError = ({ message }) => {
       setStartingGame(false)
+      setChangingMap(false)
       setError(message)
+    }
+    const onMapChanged = () => {
+      setShowMapPicker(false)
+      setChangingMap(false)
     }
 
     socket.on('fleet_accepted', onFleetAccepted)
     socket.on('game_start', onGameStart)
     socket.on('room_update', onRoomUpdate)
     socket.on('error', onError)
+    socket.on('map_changed', onMapChanged)
 
     return () => {
       socket.off('fleet_accepted', onFleetAccepted)
       socket.off('game_start', onGameStart)
       socket.off('room_update', onRoomUpdate)
       socket.off('error', onError)
+      socket.off('map_changed', onMapChanged)
     }
   }, [socket, roomId, navigate, setGameData])
 
@@ -117,6 +132,13 @@ export default function GameSetupPage() {
     setStartingGame(true)
     setError('')
     socket.emit('start_game', { roomId })
+  }
+
+  function handleChangeMap(boardTemplateId) {
+    if (!socket) return
+    setChangingMap(true)
+    setError('')
+    socket.emit('change_map', { roomId, boardTemplateId })
   }
 
   return (
@@ -159,17 +181,67 @@ export default function GameSetupPage() {
           </div>
 
           {isHost ? (
-            <button
-              onClick={handleStartGame}
-              disabled={!canStartGame || startingGame}
-              style={{
-                ...startBtnStyle,
-                opacity: canStartGame && !startingGame ? 1 : 0.45,
-                cursor: canStartGame && !startingGame ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {startingGame ? 'Uruchamianie…' : 'Start gry'}
-            </button>
+            <>
+              <button
+                onClick={handleStartGame}
+                disabled={!canStartGame || startingGame}
+                style={{
+                  ...startBtnStyle,
+                  opacity: canStartGame && !startingGame ? 1 : 0.45,
+                  cursor: canStartGame && !startingGame ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {startingGame ? 'Uruchamianie…' : 'Start gry'}
+              </button>
+              <button
+                onClick={() => setShowMapPicker(p => !p)}
+                style={{
+                  marginTop: '8px',
+                  width: '100%',
+                  background: 'rgba(37,99,235,0.12)',
+                  color: '#60a5fa',
+                  border: '1px solid rgba(37,99,235,0.25)',
+                  borderRadius: '8px',
+                  padding: '8px 14px',
+                  fontSize: '0.85rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                {showMapPicker ? 'Ukryj wybór mapy' : '🗺 Zmień mapę'}
+              </button>
+              {showMapPicker && (
+                <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {myBoards.length === 0 ? (
+                    <p style={{ color: '#64748b', fontSize: '0.8rem', margin: 0 }}>Brak dostępnych map.</p>
+                  ) : myBoards.map(b => {
+                    const bid = b._id || b.id
+                    const isActive = (room?.settings?.boardTemplateId === bid || room?.settings?.boardTemplateId?._id === bid || room?.settings?.boardTemplateId?.toString() === bid)
+                    return (
+                      <button
+                        key={bid}
+                        onClick={() => !isActive && handleChangeMap(bid)}
+                        disabled={changingMap || isActive}
+                        style={{
+                          background: isActive ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+                          color: isActive ? '#4ade80' : '#cbd5e1',
+                          border: isActive ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: '7px',
+                          padding: '8px 12px',
+                          cursor: isActive || changingMap ? 'default' : 'pointer',
+                          fontSize: '0.82rem',
+                          textAlign: 'left',
+                          opacity: changingMap && !isActive ? 0.55 : 1,
+                        }}
+                      >
+                        {b.name || `Mapa ${(bid || '').slice(-5)}`} — {b.size || b.boardSize || '?'}×{b.size || b.boardSize || '?'}
+                        {isActive && ' ✓'}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           ) : (
             <p style={{ color:'#64748b', fontSize:'0.8rem', marginTop:'12px', marginBottom:0 }}>
               Tylko lider pokoju może wystartować grę, gdy obaj gracze są gotowi.

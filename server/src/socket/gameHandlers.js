@@ -464,6 +464,38 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
     }
   });
 
+  // surrender: player gives up, opponent wins
+  socket.on('surrender', async ({ gameId } = {}) => {
+    try {
+      if (!gameId) return socket.emit('error', { message: 'gameId is required' });
+
+      const game = await Game.findById(gameId);
+      if (!game) return socket.emit('error', { message: 'Game not found' });
+      if (game.status !== 'in_game') return socket.emit('error', { message: 'Game is not active' });
+
+      const isPlayer = game.players.some(p => p.toString() === userId);
+      if (!isPlayer) return socket.emit('error', { message: 'Not a player in this game' });
+
+      const winnerId = game.players.find(p => p.toString() !== userId);
+      game.status = 'finished';
+      game.winnerId = winnerId;
+      await game.save();
+
+      clearTurnTimer(turnTimers, gameId);
+      await closeRoomAfterGame(io, game.roomId);
+
+      for (const pid of game.players) {
+        emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
+          winnerId: winnerId ? winnerId.toString() : null,
+          surrenderedBy: userId,
+        });
+      }
+    } catch (err) {
+      console.error('surrender error:', err);
+      socket.emit('error', { message: 'Failed to surrender' });
+    }
+  });
+
   // reconnect_game: send current game state to rejoining player
   socket.on('reconnect_game', async ({ gameId } = {}) => {
     try {

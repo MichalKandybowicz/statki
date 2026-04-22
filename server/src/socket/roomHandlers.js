@@ -146,6 +146,48 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
     }
   });
 
+  // change_map: host changes board template before game starts
+  socket.on('change_map', async ({ roomId, boardTemplateId } = {}) => {
+    try {
+      if (!roomId || !boardTemplateId) {
+        return socket.emit('error', { message: 'roomId and boardTemplateId are required' });
+      }
+
+      const room = await Room.findById(roomId);
+      if (!room) return socket.emit('error', { message: 'Room not found' });
+      await ensureUniqueRoomPlayers(room);
+
+      if (room.hostId.toString() !== userId) {
+        return socket.emit('error', { message: 'Only the host can change the map' });
+      }
+      if (room.status !== 'waiting' && room.status !== 'setup') {
+        return socket.emit('error', { message: 'Cannot change map after game has started' });
+      }
+
+      const BoardTemplate = require('../models/BoardTemplate');
+      const tmpl = await BoardTemplate.findOne({ _id: boardTemplateId, ownerId: userId });
+      if (!tmpl) {
+        return socket.emit('error', { message: 'Board template not found or not yours' });
+      }
+
+      room.settings.boardTemplateId = tmpl._id;
+      room.settings.boardSize = tmpl.size;
+      // reset ready state so players re-confirm placement on new map
+      room.players.forEach(p => { p.ready = false; });
+      room.status = 'waiting';
+      await room.save();
+
+      await room.populate('hostId', 'email');
+      await room.populate('players.userId', 'email');
+
+      io.to(`room:${roomId}`).emit('room_update', toSafeRoom(room));
+      socket.emit('map_changed', { boardTemplateId: tmpl._id.toString(), boardSize: tmpl.size, name: tmpl.name || '' });
+    } catch (err) {
+      console.error('change_map error:', err);
+      socket.emit('error', { message: 'Failed to change map' });
+    }
+  });
+
   socket.on('start_game', async ({ roomId } = {}) => {
     try {
       if (!roomId) {

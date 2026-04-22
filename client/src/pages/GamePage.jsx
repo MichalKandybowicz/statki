@@ -56,6 +56,7 @@ export default function GamePage() {
   } = useGame()
 
   const [error, setError] = useState('')
+  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false)
   const [enemySonarPositions, setEnemySonarPositions] = useState([])
   const [ownSonarPositions, setOwnSonarPositions] = useState([])
   const [targetingMode, setTargetingMode] = useState(null)
@@ -275,8 +276,9 @@ export default function GamePage() {
       appendLogEntry(`Zmiana tury: ${turnText}`, 'turn')
     }
 
-    const onGameOver = ({ winnerId: winner }) => {
-      appendLogEntry(winner === myId ? 'Koniec gry: wygrywasz' : 'Koniec gry: przegrywasz', 'over')
+  const onGameOver = ({ winnerId: winner, surrenderedBy }) => {
+      const surrenderNote = surrenderedBy && surrenderedBy !== myId ? ' (przeciwnik sie poddal)' : surrenderedBy === myId ? ' (poddales sie)' : ''
+      appendLogEntry((winner === myId ? 'Koniec gry: wygrywasz' : 'Koniec gry: przegrywasz') + surrenderNote, 'over')
     }
 
     socket.on('error', onError)
@@ -493,7 +495,32 @@ export default function GamePage() {
           {isMyTurn ? '⚡ TWOJA TURA' : '⏳ Tura przeciwnika'}
         </span>
         <TurnTimer turnTimeLimit={turnTimeLimit || 60} turnStartedAt={turnStartedAt} />
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <div style={{ marginLeft: 'auto', display:'flex', gap:'8px', position: 'relative', alignItems:'center' }}>
+          {!showSurrenderConfirm ? (
+            <button
+              onClick={() => setShowSurrenderConfirm(true)}
+              style={{ background:'rgba(239,68,68,0.12)', color:'#fca5a5', border:'1px solid rgba(239,68,68,0.25)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+            >
+              Poddaj się
+            </button>
+          ) : (
+            <div style={{ display:'flex', gap:'6px', alignItems:'center', background:'rgba(239,68,68,0.12)', border:'1px solid rgba(239,68,68,0.3)', borderRadius:'8px', padding:'6px 10px' }}>
+              <span style={{ color:'#fca5a5', fontSize:'0.78rem' }}>Na pewno?</span>
+              <button
+                onClick={() => { socket?.emit('surrender', { gameId }); setShowSurrenderConfirm(false) }}
+                style={{ background:'rgba(239,68,68,0.7)', color:'white', border:'none', borderRadius:'5px', padding:'3px 10px', cursor:'pointer', fontSize:'0.76rem', fontWeight:700 }}
+              >
+                Tak
+              </button>
+              <button
+                onClick={() => setShowSurrenderConfirm(false)}
+                style={{ background:'rgba(255,255,255,0.07)', color:'#94a3b8', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'5px', padding:'3px 8px', cursor:'pointer', fontSize:'0.76rem' }}
+              >
+                Nie
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => setShowSoundMenu(prev => !prev)}
             style={{ background:'rgba(255,255,255,0.06)', color:'#cbd5e1', border:'1px solid rgba(255,255,255,0.14)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
