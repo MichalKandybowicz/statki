@@ -1,6 +1,13 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
+  username: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true,
+    maxlength: 32,
+  },
   email: {
     type: String,
     unique: true,
@@ -40,6 +47,7 @@ const userSchema = new mongoose.Schema({
 userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();
   delete obj.passwordHash;
+  if (!obj.username) obj.username = obj.email.split('@')[0];
   return obj;
 };
 

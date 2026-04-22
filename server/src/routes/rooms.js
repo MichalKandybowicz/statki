@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
   try {
     const rooms = await Room.find({ status: 'waiting' })
       .select('-settings.password')
-      .populate('hostId', 'email')
+      .populate('hostId', 'email username')
       .sort({ createdAt: -1 });
 
     for (const room of rooms) {
@@ -66,7 +66,7 @@ router.post('/', async (req, res) => {
     await room.save();
 
     const populated = await Room.findById(room._id)
-      .populate('hostId', 'email');
+      .populate('hostId', 'email username');
 
     await ensureUniqueRoomPlayers(populated);
 
@@ -85,13 +85,13 @@ router.post('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const room = await Room.findById(req.params.id)
-      .populate('hostId', 'email')
-      .populate('players.userId', 'email');
+      .populate('hostId', 'email username')
+      .populate('players.userId', 'email username');
 
     if (!room) return res.status(404).json({ error: 'Room not found' });
 
     await ensureUniqueRoomPlayers(room);
-    await room.populate('players.userId', 'email');
+    await room.populate('players.userId', 'email username');
 
     const isPlayer = room.players.some(
       (p) => p.userId && p.userId._id.toString() === req.user._id.toString()
@@ -139,8 +139,8 @@ router.post('/:id/join', async (req, res) => {
     await room.save();
 
     const populated = await Room.findById(room._id)
-      .populate('hostId', 'email')
-      .populate('players.userId', 'email');
+      .populate('hostId', 'email username')
+      .populate('players.userId', 'email username');
 
     await ensureUniqueRoomPlayers(populated);
 

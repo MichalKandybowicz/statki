@@ -77,10 +77,11 @@ axiosInstance.interceptors.response.use(
 )
 
 export const auth = {
-  register: (email, password) => axiosInstance.post('/auth/register', { email, password }),
+  register: (email, password, username) => axiosInstance.post('/auth/register', { email, password, username }),
   login: (email, password) => axiosInstance.post('/auth/login', { email, password }),
   refresh: (refreshToken) => axiosInstance.post('/auth/refresh', { refreshToken }),
   getMe: () => axiosInstance.get('/auth/me'),
+  updateMe: (data) => axiosInstance.patch('/auth/me', data),
 }
 
 export const rooms = {

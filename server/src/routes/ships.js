@@ -67,7 +67,7 @@ router.get('/', async (req, res) => {
 router.get('/community', async (req, res) => {
   try {
     const ships = await ShipTemplate.find()
-      .populate('ownerId', 'email')
+      .populate('ownerId', 'email username')
       .sort({ _id: -1 })
       .lean();
 

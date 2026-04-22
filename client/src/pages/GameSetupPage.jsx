@@ -167,7 +167,7 @@ export default function GameSetupPage() {
                 <div key={playerId || idx} style={playerRowStyle}>
                   <div>
                     <div style={{ color:'#e2e8f0', fontSize:'0.9rem', fontWeight:600 }}>
-                      {player.userId?.email || `Gracz ${idx + 1}`}
+                      {player.userId?.username || player.userId?.email?.split('@')[0] || `Gracz ${idx + 1}`}
                       {isPlayerHost && <span style={hostBadgeStyle}>HOST</span>}
                       {playerId === user?._id?.toString() && <span style={meBadgeStyle}>TY</span>}
                     </div>

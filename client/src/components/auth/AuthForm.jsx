@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 
 export default function AuthForm({ type, onSubmit, error, loading }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [username, setUsername] = useState('')
 
   function handleSubmit(e) {
     e.preventDefault()
-    onSubmit(email, password)
+    onSubmit(email, password, username)
   }
 
   const isLogin = type === 'login'
@@ -22,6 +22,21 @@ export default function AuthForm({ type, onSubmit, error, loading }) {
       </p>
 
       {error && <div style={errorStyle}>{error}</div>}
+
+      {!isLogin && (
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Nick <span style={{ color:'#64748b', fontWeight:400 }}>(opcjonalny, maks. 32 znaki)</span></label>
+          <input
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            maxLength={32}
+            autoComplete="username"
+            style={inputStyle}
+            placeholder="Twój nick w grze"
+          />
+        </div>
+      )}
 
       <div style={fieldStyle}>
         <label style={labelStyle}>Email</label>
@@ -55,9 +70,9 @@ export default function AuthForm({ type, onSubmit, error, loading }) {
 
       <p style={{ marginTop: '20px', textAlign: 'center', color: '#64748b', fontSize: '0.875rem' }}>
         {isLogin ? (
-          <>Don&apos;t have an account?{' '}<Link to="/register">Register</Link></>
+          <>Don&apos;t have an account?{' '}<a href="/register">Register</a></>
         ) : (
-          <>Already have an account?{' '}<Link to="/login">Sign in</Link></>
+          <>Already have an account?{' '}<a href="/login">Sign in</a></>
         )}
       </p>
     </form>

@@ -220,8 +220,8 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       if (player) player.ready = true;
       await room.save();
 
-      await room.populate('hostId', 'email');
-      await room.populate('players.userId', 'email');
+      await room.populate('hostId', 'email username');
+      await room.populate('players.userId', 'email username');
 
       socket.emit('fleet_accepted', { message: 'Fleet placement accepted' });
 

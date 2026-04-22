@@ -1,31 +1,40 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import useAuth from '../../hooks/useAuth'
+import SettingsModal from './SettingsModal.jsx'
 
 export default function Navbar() {
   const { user, logout } = useAuth()
   const location = useLocation()
+  const [showSettings, setShowSettings] = useState(false)
 
   if (location.pathname.startsWith('/game/')) return null
 
+  const displayName = user?.username || user?.email?.split('@')[0] || 'Gracz'
+
   return (
-    <nav style={navStyle}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-        <Link to="/" style={brandStyle}>⚓ Statki</Link>
+    <>
+      <nav style={navStyle}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+          <Link to="/" style={brandStyle}>⚓ Statki</Link>
+          {user && (
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <NavLink to="/">Lobby</NavLink>
+              <NavLink to="/ships">My Ships</NavLink>
+              <NavLink to="/boards">My Boards</NavLink>
+            </div>
+          )}
+        </div>
         {user && (
-          <div style={{ display: 'flex', gap: '4px' }}>
-            <NavLink to="/">Lobby</NavLink>
-            <NavLink to="/ships">My Ships</NavLink>
-            <NavLink to="/boards">My Boards</NavLink>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{displayName}</span>
+            <button onClick={() => setShowSettings(true)} style={settingsBtnStyle}>Ustawienia</button>
+            <button onClick={logout} style={logoutBtnStyle}>Logout</button>
           </div>
         )}
-      </div>
-      {user && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <span style={{ color: '#64748b', fontSize: '0.85rem' }}>{user.email}</span>
-          <button onClick={logout} style={logoutBtnStyle}>Logout</button>
-        </div>
-      )}
-    </nav>
+      </nav>
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
+    </>
   )
 }
 
@@ -75,6 +84,17 @@ const logoutBtnStyle = {
   background: 'rgba(239,68,68,0.15)',
   color: '#f87171',
   border: '1px solid rgba(239,68,68,0.25)',
+  padding: '6px 14px',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '0.85rem',
+  fontWeight: '500',
+}
+
+const settingsBtnStyle = {
+  background: 'rgba(37,99,235,0.12)',
+  color: '#60a5fa',
+  border: '1px solid rgba(37,99,235,0.25)',
   padding: '6px 14px',
   borderRadius: '6px',
   cursor: 'pointer',

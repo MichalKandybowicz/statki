@@ -45,14 +45,20 @@ export function AuthProvider({ children }) {
     return newUser
   }, [])
 
-  const register = useCallback(async (email, password) => {
-    const res = await authApi.register(email, password)
+  const register = useCallback(async (email, password, username) => {
+    const res = await authApi.register(email, password, username)
     const { token: newToken, refreshToken, user: newUser } = res.data
     localStorage.setItem('token', newToken)
     localStorage.setItem('refreshToken', refreshToken)
     setToken(newToken)
     setUser(newUser)
     return newUser
+  }, [])
+
+  const updateProfile = useCallback(async (data) => {
+    const res = await authApi.updateMe(data)
+    setUser(res.data.user)
+    return res.data.user
   }, [])
 
   const logout = useCallback(() => {
@@ -64,7 +70,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, refreshUser, updateProfile }}>
       {children}
     </AuthContext.Provider>
   )

@@ -7,10 +7,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const { register } = useAuth()
   const navigate = useNavigate()
-  async function handleSubmit(email, password) {
+  async function handleSubmit(email, password, username) {
     setError(''); setLoading(true)
-    try { await register(email, password); navigate('/') }
-    catch (err) { setError(err.response?.data?.message || 'Registration failed') }
+    try { await register(email, password, username || undefined); navigate('/') }
+    catch (err) { setError(err.response?.data?.error || err.response?.data?.message || 'Registration failed') }
     finally { setLoading(false) }
   }
   return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', minHeight:'calc(100vh - 60px)', padding:'20px' }}><AuthForm type="register" onSubmit={handleSubmit} error={error} loading={loading} /></div>

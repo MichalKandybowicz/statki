@@ -12,12 +12,12 @@ function toSafeRoom(room) {
 
 async function loadSafeRoom(roomId) {
   const room = await Room.findById(roomId)
-    .populate('hostId', 'email')
-    .populate('players.userId', 'email');
+    .populate('hostId', 'email username')
+    .populate('players.userId', 'email username');
 
   if (room) {
     await ensureUniqueRoomPlayers(room);
-    await room.populate('players.userId', 'email');
+    await room.populate('players.userId', 'email username');
   }
 
   return room ? toSafeRoom(room) : null;
@@ -34,15 +34,15 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
       }
 
       const room = await Room.findById(roomId)
-        .populate('hostId', 'email')
-        .populate('players.userId', 'email');
+        .populate('hostId', 'email username')
+        .populate('players.userId', 'email username');
 
       if (!room) {
         return socket.emit('error', { message: 'Room not found' });
       }
 
       await ensureUniqueRoomPlayers(room);
-      await room.populate('players.userId', 'email');
+      await room.populate('players.userId', 'email username');
 
       const isPlayer = room.players.some(
         (p) => getPlayerUserId(p) === userId
@@ -63,7 +63,7 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
         room.players.push({ userId: socket.user._id, ready: false });
         await room.save();
         await ensureUniqueRoomPlayers(room);
-        await room.populate('players.userId', 'email');
+        await room.populate('players.userId', 'email username');
       }
 
       socket.join(`room:${roomId}`);
@@ -104,8 +104,8 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
       }
 
       await room.save();
-      await room.populate('hostId', 'email');
-      await room.populate('players.userId', 'email');
+      await room.populate('hostId', 'email username');
+      await room.populate('players.userId', 'email username');
 
       const safeRoom = toSafeRoom(room);
 
@@ -134,8 +134,8 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
 
       player.ready = true;
       await room.save();
-      await room.populate('hostId', 'email');
-      await room.populate('players.userId', 'email');
+      await room.populate('hostId', 'email username');
+      await room.populate('players.userId', 'email username');
 
       const safeRoom = toSafeRoom(room);
 
@@ -177,8 +177,8 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
       room.status = 'waiting';
       await room.save();
 
-      await room.populate('hostId', 'email');
-      await room.populate('players.userId', 'email');
+      await room.populate('hostId', 'email username');
+      await room.populate('players.userId', 'email username');
 
       io.to(`room:${roomId}`).emit('room_update', toSafeRoom(room));
       socket.emit('map_changed', { boardTemplateId: tmpl._id.toString(), boardSize: tmpl.size, name: tmpl.name || '' });

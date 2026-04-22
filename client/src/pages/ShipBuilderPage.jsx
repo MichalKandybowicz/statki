@@ -246,7 +246,7 @@ export default function ShipBuilderPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {communityShips.map(s => {
                 const isOwn = !!s.isOwn
-                const ownerLabel = s.owner?.email ? `Autor: ${s.owner.email}` : 'Autor: nieznany'
+                const ownerLabel = s.owner ? `Autor: ${s.owner.username || s.owner.email?.split('@')[0] || 'nieznany'}` : 'Autor: nieznany'
                 return (
                   <div key={`community-${s._id || s.id}`}>
                     <div style={{ color: '#64748b', fontSize: '0.72rem', marginBottom: '4px' }}>{ownerLabel}</div>

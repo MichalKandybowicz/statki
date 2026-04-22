@@ -5,7 +5,7 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
   const turnTimeLimit = room.settings?.turnTimeLimit || room.turnTimeLimit || 60
   const shipLimit = room.settings?.shipLimit || 5
   const roomId = room._id || room.id
-  const hostEmail = room.hostId?.email || room.host?.email || room.hostEmail || 'Nieznany gospodarz'
+  const hostName = room.hostId?.username || room.hostId?.email?.split('@')[0] || room.host?.username || room.host?.email?.split('@')[0] || 'Nieznany gospodarz'
 
   // Detect if current user is the host
   const hostId = room.hostId?._id || room.host?._id || room.host || room.hostId
@@ -34,7 +34,7 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
           </span>
         </div>
         <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '6px' }}>
-          Założyciel: <span style={{ color: '#e2e8f0' }}>{hostEmail}</span>
+          Założyciel: <span style={{ color: '#e2e8f0' }}>{hostName}</span>
         </div>
         <div style={{ display: 'flex', gap: '16px', color: '#64748b', fontSize: '0.8rem', flexWrap: 'wrap' }}>
           <span>Plansza {boardSize}×{boardSize}</span>
