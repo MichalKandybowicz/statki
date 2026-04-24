@@ -222,9 +222,7 @@ export default function GamePage() {
       const cell = toCellLabel(x, y)
       const outcome = sunk ? 'trafienie krytyczne (zatopienie)' : hit ? 'trafienie' : 'pudlo'
       appendLogEntry(`${actor}: strzal w ${cell} -> ${outcome}`, hit ? 'hit' : 'miss')
-      if (playerId === myId) {
-        playShotResultSound(hit || sunk ? 'hit' : 'miss')
-      }
+      playShotResultSound(hit || sunk ? 'hit' : 'miss')
     }
 
     const onAbilityResult = ({ playerId, abilityType, results, origin, foundCount, positions }) => {
@@ -266,7 +264,7 @@ export default function GamePage() {
         })
       }
 
-      if (playerId === myId && shots > 0) {
+      if (shots > 0) {
         if (shots === 1) {
           playShotResultSound(hits > 0 || sunkAny ? 'hit' : 'miss')
         } else {
@@ -308,20 +306,18 @@ export default function GamePage() {
   useEffect(() => {
     if (!myId) return
     const previousTurn = previousTurnRef.current
-    if (previousTurn && previousTurn !== turn && previousTurn === myId) {
+    if (previousTurn && previousTurn !== turn && turn === myId) {
       const waitMs = Math.max(0, pendingEffectsUntilRef.current - Date.now())
       if (waitMs > 0) {
         queueEffect(() => {
           playTurnEndSound()
-          appendLogEntry('Twoja tura dobiegla konca', 'turn')
         }, waitMs + 80)
       } else {
         playTurnEndSound()
-        appendLogEntry('Twoja tura dobiegla konca', 'turn')
       }
     }
     previousTurnRef.current = turn
-  }, [turn, myId, playTurnEndSound, appendLogEntry, queueEffect])
+  }, [turn, myId, playTurnEndSound, queueEffect])
 
   useEffect(() => {
     setBattleLog([])
