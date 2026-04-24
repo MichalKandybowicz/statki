@@ -9,7 +9,7 @@ import AbilityPanel from '../components/game/AbilityPanel.jsx'
 import TurnTimer from '../components/game/TurnTimer.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
 
-const SOUND_SETTINGS_KEY = 'statki:sound-settings:v1'
+const SOUND_SETTINGS_KEY = 'statki:sound-settings:v2'
 const BATTLE_LAYOUT_KEY = 'statki:battle-layout:v1'
 const ABILITY_REVEAL_STEP_MS = 1000
 const DEFAULT_SOUND_SETTINGS = {
@@ -119,8 +119,19 @@ export default function GamePage() {
          turnEnd: { ...DEFAULT_SOUND_SETTINGS.turnEnd, ...(parsed.turnEnd || {}) },
          hit: { ...DEFAULT_SOUND_SETTINGS.hit, ...(parsed.hit || {}) },
          miss: { ...DEFAULT_SOUND_SETTINGS.miss, ...(parsed.miss || {}) },
-         sonarHit: { ...DEFAULT_SOUND_SETTINGS.sonarHit, ...(parsed.sonarHit || {}) },
-         sonarMiss: { ...DEFAULT_SOUND_SETTINGS.sonarMiss, ...(parsed.sonarMiss || {}) },
+         // Wymuszenie dedykowanych plikow sonaru zapobiega dziedziczeniu starego src hit/miss.
+         sonarHit: {
+           ...DEFAULT_SOUND_SETTINGS.sonarHit,
+           ...(parsed.sonarHit || {}),
+           src: DEFAULT_SOUND_SETTINGS.sonarHit.src,
+           maxDuration: DEFAULT_SOUND_SETTINGS.sonarHit.maxDuration,
+         },
+         sonarMiss: {
+           ...DEFAULT_SOUND_SETTINGS.sonarMiss,
+           ...(parsed.sonarMiss || {}),
+           src: DEFAULT_SOUND_SETTINGS.sonarMiss.src,
+           maxDuration: DEFAULT_SOUND_SETTINGS.sonarMiss.maxDuration,
+         },
        })
      } catch {}
    }, [])
@@ -496,11 +507,6 @@ export default function GamePage() {
                fontWeight:'600',
              }}
            >
-             {allPlayerIds.map(pid => (
-               <option key={pid} value={pid}>
-                 {pid === myId ? 'Ty' : 'Przeciwnik'}
-               </option>
-             ))}
            </select>
          )}
        </div>
