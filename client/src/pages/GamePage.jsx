@@ -17,6 +17,8 @@ const DEFAULT_SOUND_SETTINGS = {
   turnEnd: { enabled: true, volume: 0.9, src: '/sounds/turn-end.mp3' },
   hit: { enabled: true, volume: 1, src: '/sounds/hit.mp3' },
   miss: { enabled: true, volume: 0.85, src: '/sounds/miss.mp3' },
+  sonarHit: { enabled: true, volume: 0.9, src: '/sounds/hit.mp3', maxDuration: 1.5 },
+  sonarMiss: { enabled: true, volume: 0.8, src: '/sounds/miss.mp3', maxDuration: 1.5 },
 }
 
 const DEFAULT_BATTLE_LAYOUT = {
@@ -105,19 +107,21 @@ export default function GamePage() {
     return `${String.fromCharCode(65 + y)}${x + 1}`
   }, [])
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SOUND_SETTINGS_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      setSoundSettings({
-        masterVolume: Number(parsed.masterVolume ?? DEFAULT_SOUND_SETTINGS.masterVolume),
-        turnEnd: { ...DEFAULT_SOUND_SETTINGS.turnEnd, ...(parsed.turnEnd || {}) },
-        hit: { ...DEFAULT_SOUND_SETTINGS.hit, ...(parsed.hit || {}) },
-        miss: { ...DEFAULT_SOUND_SETTINGS.miss, ...(parsed.miss || {}) },
-      })
-    } catch {}
-  }, [])
+   useEffect(() => {
+     try {
+       const raw = localStorage.getItem(SOUND_SETTINGS_KEY)
+       if (!raw) return
+       const parsed = JSON.parse(raw)
+       setSoundSettings({
+         masterVolume: Number(parsed.masterVolume ?? DEFAULT_SOUND_SETTINGS.masterVolume),
+         turnEnd: { ...DEFAULT_SOUND_SETTINGS.turnEnd, ...(parsed.turnEnd || {}) },
+         hit: { ...DEFAULT_SOUND_SETTINGS.hit, ...(parsed.hit || {}) },
+         miss: { ...DEFAULT_SOUND_SETTINGS.miss, ...(parsed.miss || {}) },
+         sonarHit: { ...DEFAULT_SOUND_SETTINGS.sonarHit, ...(parsed.sonarHit || {}) },
+         sonarMiss: { ...DEFAULT_SOUND_SETTINGS.sonarMiss, ...(parsed.sonarMiss || {}) },
+       })
+     } catch {}
+   }, [])
 
   useEffect(() => {
     localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(soundSettings))
@@ -157,18 +161,28 @@ export default function GamePage() {
     }))
   }, [])
 
-  const playConfiguredSound = useCallback((soundKey, fallbackKind) => {
-    try {
-      const conf = soundSettings[soundKey]
-      if (!conf?.enabled) return
-      const baseVol = Math.max(0, Math.min(1, soundSettings.masterVolume || 0))
-      const localVol = Math.max(0, Math.min(1, conf.volume || 0))
-      const finalVol = Math.max(0, Math.min(1, baseVol * localVol))
-      if (finalVol <= 0) return
+   const playConfiguredSound = useCallback((soundKey, fallbackKind) => {
+     try {
+       const conf = soundSettings[soundKey]
+       if (!conf?.enabled) return
+       const baseVol = Math.max(0, Math.min(1, soundSettings.masterVolume || 0))
+       const localVol = Math.max(0, Math.min(1, conf.volume || 0))
+       const finalVol = Math.max(0, Math.min(1, baseVol * localVol))
+       if (finalVol <= 0) return
 
-      const audio = new Audio(conf.src)
-      audio.volume = finalVol
-      audio.play().catch(() => {
+       const audio = new Audio(conf.src)
+       audio.volume = finalVol
+
+       // Obsługuj maxDuration (w sekundach)
+       if (conf.maxDuration && conf.maxDuration > 0) {
+         audio.addEventListener('canplay', () => {
+           if (audio.duration > conf.maxDuration) {
+             setTimeout(() => audio.pause(), conf.maxDuration * 1000)
+           }
+         }, { once: true })
+       }
+
+       audio.play().catch(() => {
         const Ctx = window.AudioContext || window.webkitAudioContext
         if (!Ctx) return
         const ctx = new Ctx()
@@ -197,13 +211,17 @@ export default function GamePage() {
     } catch {}
   }, [soundSettings])
 
-  const playTurnEndSound = useCallback(() => {
-    playConfiguredSound('turnEnd', 'turn')
-  }, [playConfiguredSound])
+   const playTurnEndSound = useCallback(() => {
+     playConfiguredSound('turnEnd', 'turn')
+   }, [playConfiguredSound])
 
-  const playShotResultSound = useCallback((kind) => {
-    playConfiguredSound(kind === 'hit' ? 'hit' : 'miss', kind)
-  }, [playConfiguredSound])
+   const playShotResultSound = useCallback((kind) => {
+     playConfiguredSound(kind === 'hit' ? 'hit' : 'miss', kind)
+   }, [playConfiguredSound])
+
+   const playSonarSound = useCallback((soundKey) => {
+     playConfiguredSound(soundKey, 'sonar')
+   }, [playConfiguredSound])
 
   useEffect(() => {
     if (socket && gameId) socket.emit('reconnect_game', { gameId })
@@ -229,18 +247,20 @@ export default function GamePage() {
       const actor = playerId === myId ? 'Ty' : 'Przeciwnik'
 
       if (abilityType === 'sonar') {
-        const labels = (positions || []).map(pos => toCellLabel(pos.x, pos.y))
-        const labelText = labels.length > 0 ? ` [${labels.join(', ')}]` : ''
-        if (playerId === myId) {
-          const originLabel = origin ? toCellLabel(origin.x, origin.y) : '??'
-          appendLogEntry(`${actor}: sonar z ${originLabel} -> wykryto ${foundCount || 0} pol${labelText}`, 'sonar')
-          setEnemySonarPositions(prev => mergeUniquePositions(prev, positions || []))
-        } else {
-          appendLogEntry(`${actor}: sonar wykryl ${foundCount || 0} pol${labelText}`, 'sonar')
-          setOwnSonarPositions(prev => mergeUniquePositions(prev, positions || []))
-        }
-        return
-      }
+         const labels = (positions || []).map(pos => toCellLabel(pos.x, pos.y))
+         const labelText = labels.length > 0 ? ` [${labels.join(', ')}]` : ''
+         if (playerId === myId) {
+           const originLabel = origin ? toCellLabel(origin.x, origin.y) : '??'
+           appendLogEntry(`${actor}: sonar z ${originLabel} -> wykryto ${foundCount || 0} pol${labelText}`, 'sonar')
+           setEnemySonarPositions(prev => mergeUniquePositions(prev, positions || []))
+         } else {
+           appendLogEntry(`${actor}: sonar wykryl ${foundCount || 0} pol${labelText}`, 'sonar')
+           setOwnSonarPositions(prev => mergeUniquePositions(prev, positions || []))
+         }
+         // Graj dźwięk sonaru
+         playSonarSound(foundCount > 0 ? 'sonarHit' : 'sonarMiss')
+         return
+       }
 
       const shots = Array.isArray(results) ? results.length : 0
       const hits = Array.isArray(results) ? results.filter(r => r.hit).length : 0
@@ -293,15 +313,15 @@ export default function GamePage() {
     socket.on('ability_result', onAbilityResult)
     socket.on('turn_update', onTurnUpdate)
     socket.on('game_over', onGameOver)
-    return () => {
-      socket.off('error', onError)
-      socket.off('sonar_result', onSonar)
-      socket.off('move_result', onMoveResult)
-      socket.off('ability_result', onAbilityResult)
-      socket.off('turn_update', onTurnUpdate)
-      socket.off('game_over', onGameOver)
-    }
-  }, [socket, myId, appendLogEntry, toCellLabel, playShotResultSound, queueEffect, mergeUniquePositions])
+     return () => {
+       socket.off('error', onError)
+       socket.off('sonar_result', onSonar)
+       socket.off('move_result', onMoveResult)
+       socket.off('ability_result', onAbilityResult)
+       socket.off('turn_update', onTurnUpdate)
+       socket.off('game_over', onGameOver)
+     }
+   }, [socket, myId, appendLogEntry, toCellLabel, playShotResultSound, playSonarSound, queueEffect, mergeUniquePositions])
 
   useEffect(() => {
     if (!myId) return
@@ -625,11 +645,13 @@ export default function GamePage() {
                 />
               </div>
 
-              {[
-                { key: 'turnEnd', label: 'Koniec tury' },
-                { key: 'hit', label: 'Trafienie' },
-                { key: 'miss', label: 'Pudlo' },
-              ].map(item => (
+               {[
+                 { key: 'turnEnd', label: 'Koniec tury' },
+                 { key: 'hit', label: 'Trafienie' },
+                 { key: 'miss', label: 'Pudlo' },
+                 { key: 'sonarHit', label: 'Sonar (coś wykrył)' },
+                 { key: 'sonarMiss', label: 'Sonar (nic nie wykrył)' },
+               ].map(item => (
                 <div key={item.key} style={{ marginBottom:'10px', paddingBottom:'8px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                   <label style={{ display:'flex', alignItems:'center', justifyContent:'space-between', color:'#cbd5e1', fontSize:'0.78rem', marginBottom:'4px' }}>
                     <span>{item.label}</span>
