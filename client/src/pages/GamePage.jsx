@@ -44,18 +44,19 @@ export default function GamePage() {
     clearGame,
   } = useGame()
 
-  const [error, setError] = useState('')
-  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false)
-  const [enemySonarPositions, setEnemySonarPositions] = useState([])
-  const [ownSonarPositions, setOwnSonarPositions] = useState([])
-  const [targetingMode, setTargetingMode] = useState(null)
-  const [selectedShipIndex, setSelectedShipIndex] = useState(0)
-  const [linearDirection, setLinearDirection] = useState('horizontal')
-  const [linearHoverStart, setLinearHoverStart] = useState(null)
-  const [battleLog, setBattleLog] = useState([])
-  const [showSoundMenu, setShowSoundMenu] = useState(false)
-  const [soundSettings, setSoundSettings] = useState(DEFAULT_SOUND_SETTINGS)
-  const [battleLayout, setBattleLayout] = useState(DEFAULT_BATTLE_LAYOUT)
+   const [error, setError] = useState('')
+   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false)
+   const [enemySonarPositions, setEnemySonarPositions] = useState([])
+   const [ownSonarPositions, setOwnSonarPositions] = useState([])
+   const [targetingMode, setTargetingMode] = useState(null)
+   const [selectedShipIndex, setSelectedShipIndex] = useState(0)
+   const [linearDirection, setLinearDirection] = useState('horizontal')
+   const [linearHoverStart, setLinearHoverStart] = useState(null)
+   const [battleLog, setBattleLog] = useState([])
+   const [showSoundMenu, setShowSoundMenu] = useState(false)
+   const [soundSettings, setSoundSettings] = useState(DEFAULT_SOUND_SETTINGS)
+   const [battleLayout, setBattleLayout] = useState(DEFAULT_BATTLE_LAYOUT)
+   const [watchingPlayerId, setWatchingPlayerId] = useState(null)
   const previousTurnRef = useRef(null)
   const pendingEffectTimeoutsRef = useRef([])
   const pendingEffectsUntilRef = useRef(0)
@@ -339,22 +340,35 @@ export default function GamePage() {
     previousTurnRef.current = turn
   }, [turn, myId, playTurnEndSound, queueEffect])
 
-  useEffect(() => {
-    setBattleLog([])
-    setEnemySonarPositions([])
-    setOwnSonarPositions([])
-    previousTurnRef.current = null
-    clearPendingEffects()
-  }, [gameId, clearPendingEffects])
+   useEffect(() => {
+     setBattleLog([])
+     setEnemySonarPositions([])
+     setOwnSonarPositions([])
+     previousTurnRef.current = null
+     clearPendingEffects()
+     setWatchingPlayerId(null)
+   }, [gameId, clearPendingEffects])
 
-  const isMyTurn = turn === myId
-  const myBoard = myId ? boards[myId] : null
-  const enemyId = myId ? Object.keys(boards).find(id => id !== myId) : null
-  const enemyBoard = enemyId ? boards[enemyId] : null
-  const isGameOver = status === 'finished' || !!winnerId
-  const iWon = winnerId === myId
-  const selectedShip = myFleet?.[selectedShipIndex] || null
-  const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
+   // Inicjalizuj obserwowanego gracza na siebie
+   useEffect(() => {
+     if (!watchingPlayerId && myId) {
+       setWatchingPlayerId(myId)
+     }
+   }, [watchingPlayerId, myId])
+
+   const isMyTurn = turn === myId
+   const myBoard = myId ? boards[myId] : null
+   const enemyId = myId ? Object.keys(boards).find(id => id !== myId) : null
+   const enemyBoard = enemyId ? boards[enemyId] : null
+   const isGameOver = status === 'finished' || !!winnerId
+   const iWon = winnerId === myId
+   const selectedShip = myFleet?.[selectedShipIndex] || null
+   const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
+   
+   // Plansze wszystkich graczy
+   const allPlayerIds = myId ? Object.keys(boards) : []
+   const watchedBoard = watchingPlayerId ? boards[watchingPlayerId] : null
+   const isWatchingOwnBoard = watchingPlayerId === myId
 
   useEffect(() => {
     setEnemySonarPositions(prev => dropResolvedSonar(prev, enemyBoard))
@@ -459,12 +473,38 @@ export default function GamePage() {
     </div>
   )
 
-  const myBoardPanel = (
-    <div>
-      <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:'8px' }}>TWOJA PLANSZA</h3>
-      {myBoard && <GameBoard tiles={myBoard} isOwnBoard={true} boardSize={boardSize} sonarPositions={ownSonarPositions} maxBoardPx={ownBoardMaxPx} />}
-    </div>
-  )
+   const myBoardPanel = (
+     <div>
+       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px', gap:'8px' }}>
+         <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', margin:0 }}>
+           {isWatchingOwnBoard ? 'TWOJA PLANSZA' : 'OBSERWACJA'}
+         </h3>
+         {allPlayerIds.length > 1 && (
+           <select
+             value={watchingPlayerId || ''}
+             onChange={e => setWatchingPlayerId(e.target.value)}
+             style={{
+               background:'rgba(37,99,235,0.15)',
+               color:'#60a5fa',
+               border:'1px solid rgba(37,99,235,0.3)',
+               borderRadius:'5px',
+               padding:'4px 8px',
+               fontSize:'0.75rem',
+               cursor:'pointer',
+               fontWeight:'600',
+             }}
+           >
+             {allPlayerIds.map(pid => (
+               <option key={pid} value={pid}>
+                 {pid === myId ? 'Ty' : 'Przeciwnik'}
+               </option>
+             ))}
+           </select>
+         )}
+       </div>
+       {watchedBoard && <GameBoard tiles={watchedBoard} isOwnBoard={isWatchingOwnBoard} boardSize={boardSize} sonarPositions={isWatchingOwnBoard ? ownSonarPositions : []} maxBoardPx={ownBoardMaxPx} />}
+     </div>
+   )
 
   function handleEnemyClick(x, y) {
     if (targetingMode) {

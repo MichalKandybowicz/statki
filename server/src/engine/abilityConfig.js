@@ -5,13 +5,13 @@ function getAbilityRules(type, size = 1) {
     case 'linear':
       return {
         minSize: 2,
-        cooldown: normalizedSize,
+        cooldown: normalizedSize + 1,
         segmentLength: normalizedSize,
       };
     case 'random':
       return {
         minSize: 2,
-        cooldown: normalizedSize + 1,
+        cooldown: normalizedSize ,
         shotCount: Math.max(1, normalizedSize - 1),
       };
     case 'target':
@@ -24,7 +24,7 @@ function getAbilityRules(type, size = 1) {
       const scanCount = Math.ceil(normalizedSize / 3);
       return {
         minSize: 1,
-        cooldown: scanCount * 3,
+        cooldown: (scanCount * 3) +1,
         scanCount,
       };
     }
