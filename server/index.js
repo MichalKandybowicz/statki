@@ -92,6 +92,41 @@ const io = new Server(server, {
 
 initSocket(io);
 
+// Graceful shutdown handler
+function setupGracefulShutdown(io) {
+  const shutdownSignals = ['SIGTERM', 'SIGINT', 'SIGHUP'];
+
+  shutdownSignals.forEach(signal => {
+    process.on(signal, async () => {
+      console.log(`\n${signal} received. Starting graceful shutdown...`);
+
+      // Powiadom wszystkich klientów o restart
+      io.emit('server_maintenance', {
+        message: 'Server is restarting. Please reconnect.',
+        reason: 'maintenance',
+      });
+
+      // Daj klientom czas na reconnect (5 sekund)
+      await new Promise(resolve => setTimeout(resolve, 5000));
+
+      // Zamknij wszystkie połączenia
+      io.disconnectSockets(true);
+
+      // Zamknij serwer
+      server.close(() => {
+        console.log('Server closed gracefully.');
+        process.exit(0);
+      });
+
+      // Fallback: wymuś exit po 10 sekundach
+      setTimeout(() => {
+        console.error('Forced exit after timeout.');
+        process.exit(1);
+      }, 10000);
+    });
+  });
+}
+
 // Start server after DB connection
 async function start() {
   try {
@@ -100,6 +135,8 @@ async function start() {
       console.log(`Server running on port ${PORT}`);
       console.log(`Accepting connections from ${CLIENT_URL}`);
     });
+
+    setupGracefulShutdown(io);
   } catch (err) {
     console.error('Failed to start server:', err.message);
     process.exit(1);

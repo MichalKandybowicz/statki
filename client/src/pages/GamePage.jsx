@@ -17,8 +17,8 @@ const DEFAULT_SOUND_SETTINGS = {
   turnEnd: { enabled: true, volume: 0.9, src: '/sounds/turn-end.mp3' },
   hit: { enabled: true, volume: 1, src: '/sounds/hit.mp3' },
   miss: { enabled: true, volume: 0.85, src: '/sounds/miss.mp3' },
-  sonarHit: { enabled: true, volume: 0.9, src: '/sounds/hit.mp3', maxDuration: 1.5 },
-  sonarMiss: { enabled: true, volume: 0.8, src: '/sounds/miss.mp3', maxDuration: 1.5 },
+  sonarHit: { enabled: true, volume: 0.9, src: '/sounds/sonar-true.mp3', maxDuration: 1.5 },
+  sonarMiss: { enabled: true, volume: 0.8, src: '/sounds/sonar-false.mp3', maxDuration: 1.5 },
 }
 
 const DEFAULT_BATTLE_LAYOUT = {
@@ -57,6 +57,7 @@ export default function GamePage() {
    const [soundSettings, setSoundSettings] = useState(DEFAULT_SOUND_SETTINGS)
    const [battleLayout, setBattleLayout] = useState(DEFAULT_BATTLE_LAYOUT)
    const [watchingPlayerId, setWatchingPlayerId] = useState(null)
+   const [swapBoards, setSwapBoards] = useState(false)
   const previousTurnRef = useRef(null)
   const pendingEffectTimeoutsRef = useRef([])
   const pendingEffectsUntilRef = useRef(0)
@@ -347,6 +348,7 @@ export default function GamePage() {
      previousTurnRef.current = null
      clearPendingEffects()
      setWatchingPlayerId(null)
+     setSwapBoards(false)
    }, [gameId, clearPendingEffects])
 
    // Inicjalizuj obserwowanego gracza na siebie
@@ -619,12 +621,19 @@ export default function GamePage() {
           >
             Układ 2
           </button>
-          <button
-            onClick={() => setBattleLayout(prev => ({ ...prev, mode: 'bottom-horizontal' }))}
-            style={{ background:battleLayout.mode === 'bottom-horizontal' ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)', color:'#a5b4fc', border:'1px solid rgba(99,102,241,0.28)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
-          >
-            Układ 3
-          </button>
+           <button
+             onClick={() => setBattleLayout(prev => ({ ...prev, mode: 'bottom-horizontal' }))}
+             style={{ background:battleLayout.mode === 'bottom-horizontal' ? 'rgba(99,102,241,0.18)' : 'rgba(99,102,241,0.12)', color:'#a5b4fc', border:'1px solid rgba(99,102,241,0.28)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+           >
+             Układ 3
+           </button>
+           <div style={{ width:'1px', height:'24px', background:'rgba(255,255,255,0.1)' }} />
+           <button
+             onClick={() => setSwapBoards(prev => !prev)}
+             style={{ background:swapBoards ? 'rgba(168,85,247,0.18)' : 'rgba(168,85,247,0.10)', color:'#d8b4fe', border:'1px solid rgba(168,85,247,0.35)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+           >
+             🔄 Swap
+           </button>
           <button
             onClick={() => setBattleLayout(prev => ({ ...prev, boardZoom: Math.max(0.6, Math.round((prev.boardZoom - 0.1) * 10) / 10) }))}
             style={{ background:'rgba(255,255,255,0.06)', color:'#cbd5e1', border:'1px solid rgba(255,255,255,0.14)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
@@ -734,42 +743,83 @@ export default function GamePage() {
               </div>
             </div>
           )}
-        </div>
-      </div>
+       </div>
+       </div>
 
-      {battleLayout.mode === 'left-stacked' && (
-        <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
-          <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
-            {fleetAbilityPanel}
-          </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
-            {enemyBoardPanel}
-            {myBoardPanel}
-          </div>
-        </div>
-      )}
+       {/* Logika swapowania planszy */}
+       {swapBoards ? (
+         <>
+           {battleLayout.mode === 'left-stacked' && (
+             <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+                 {fleetAbilityPanel}
+               </div>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+                 {myBoardPanel}
+                 {enemyBoardPanel}
+               </div>
+             </div>
+           )}
 
-      {battleLayout.mode === 'left-side-by-side' && (
-        <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
-          <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
-            {fleetAbilityPanel}
-          </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
-            {enemyBoardPanel}
-            {myBoardPanel}
-          </div>
-        </div>
-      )}
+           {battleLayout.mode === 'left-side-by-side' && (
+             <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+                 {fleetAbilityPanel}
+               </div>
+               <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+                 {myBoardPanel}
+                 {enemyBoardPanel}
+               </div>
+             </div>
+           )}
 
-      {battleLayout.mode === 'bottom-horizontal' && (
-        <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
-            {enemyBoardPanel}
-            {myBoardPanel}
-          </div>
-          {fleetAbilityPanel}
-        </div>
-      )}
+           {battleLayout.mode === 'bottom-horizontal' && (
+             <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+               <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+                 {myBoardPanel}
+                 {enemyBoardPanel}
+               </div>
+               {fleetAbilityPanel}
+             </div>
+           )}
+         </>
+       ) : (
+         <>
+           {battleLayout.mode === 'left-stacked' && (
+             <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+                 {fleetAbilityPanel}
+               </div>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+                 {enemyBoardPanel}
+                 {myBoardPanel}
+               </div>
+             </div>
+           )}
+
+           {battleLayout.mode === 'left-side-by-side' && (
+             <div style={{ display:'grid', gridTemplateColumns:'minmax(280px, 360px) minmax(0, 1fr)', gap:'16px', alignItems:'start' }}>
+               <div style={{ display:'flex', flexDirection:'column', gap:'16px', position:'sticky', top:'76px' }}>
+                 {fleetAbilityPanel}
+               </div>
+               <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+                 {enemyBoardPanel}
+                 {myBoardPanel}
+               </div>
+             </div>
+           )}
+
+           {battleLayout.mode === 'bottom-horizontal' && (
+             <div style={{ display:'flex', flexDirection:'column', gap:'16px' }}>
+               <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap:'16px', alignItems:'start' }}>
+                 {enemyBoardPanel}
+                 {myBoardPanel}
+               </div>
+               {fleetAbilityPanel}
+             </div>
+           )}
+         </>
+       )}
 
     </div>
   )

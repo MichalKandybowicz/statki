@@ -56,10 +56,6 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function buildShipModelKey(ship) {
-  return `${ship.abilityType || ''}:${JSON.stringify(ship.shape || [])}`;
-}
-
 // GET /api/ships
 router.get('/', async (req, res) => {
   try {
@@ -74,9 +70,8 @@ router.get('/', async (req, res) => {
 // GET /api/ships/community
 router.get('/community', async (req, res) => {
   try {
-    const { abilityType, name, size, dedupe } = req.query;
+    const { abilityType, name, size } = req.query;
     const validAbilities = ['linear', 'random', 'target', 'sonar'];
-    const shouldDedupe = dedupe !== 'false';
 
     const query = {
       ownerId: { $ne: req.user._id },
@@ -103,12 +98,8 @@ router.get('/community', async (req, res) => {
       .sort({ _id: -1 })
       .lean();
 
-    const filteredShips = shouldDedupe
-      ? Array.from(new Map(ships.map(ship => [buildShipModelKey(ship), ship])).values())
-      : ships;
-
     res.json(
-      filteredShips.map((ship) => ({
+      ships.map((ship) => ({
         ...ship,
         owner: {
           _id: ship.ownerId?._id,
