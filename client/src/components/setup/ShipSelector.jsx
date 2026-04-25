@@ -2,7 +2,7 @@ import ShipGrid from '../ships/ShipGrid.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../../utils/abilityInfo.js'
 import useAuth from '../../hooks/useAuth'
 
-export default function ShipSelector({ ships, onSelect, selectedShip, onDragStart }) {
+export default function ShipSelector({ ships, onSelect, selectedShip, onDragStart, onDragEnd }) {
   const { user } = useAuth()
 
   if (!ships || ships.length === 0) {
@@ -46,6 +46,7 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
                 e.dataTransfer.setData('text/plain', id)
                 onDragStart?.(ship)
               }}
+              onDragEnd={() => onDragEnd?.()}
               style={{
                 display: 'flex', alignItems: 'flex-start', padding: '10px', borderRadius: '7px',
                 cursor: 'grab',

@@ -6,6 +6,7 @@ import useGame from '../hooks/useGame'
 import useAuth from '../hooks/useAuth'
 import { createEmptyBoard } from '../utils/boardUtils.js'
 import FleetPlacer from '../components/setup/FleetPlacer.jsx'
+import PlacedFleetSummary from '../components/setup/PlacedFleetSummary.jsx'
 
 export default function GameSetupPage() {
   const { roomId } = useParams()
@@ -31,6 +32,7 @@ export default function GameSetupPage() {
   const [shipSearch, setShipSearch] = useState('')
   const [shipAbilityFilter, setShipAbilityFilter] = useState('all')
   const [includeCommunityShips, setIncludeCommunityShips] = useState(true)
+  const [localPlacedShips, setLocalPlacedShips] = useState([])
 
   useEffect(() => {
     roomsApi.get(roomId)
@@ -65,7 +67,21 @@ export default function GameSetupPage() {
     setShipsLoading(true)
     setShipsLoadError('')
     console.log('[GameSetupPage] loading ships catalog...')
-    const [ownRes, communityRes] = await Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
+
+    // Timeout helper - if requests take longer than 8 seconds, consider it failed
+    const withTimeout = (promise, ms, label) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout loading ${label}`)), ms)
+        )
+      ])
+    }
+
+    const [ownRes, communityRes] = await Promise.allSettled([
+      withTimeout(shipsApi.list(), 8000, 'own ships'),
+      withTimeout(shipsApi.listCommunity(), 8000, 'community ships')
+    ])
 
     const own = ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : []
     const community = communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : []
@@ -487,17 +503,24 @@ export default function GameSetupPage() {
           {filteredShips.length === 0 ? (
             <div style={infoBoxStyle}>Brak statków spełniających aktualne filtry.</div>
           ) : (
-            <FleetPlacer
-              boardSize={boardSize}
-              boardTiles={tiles}
-              availableShips={filteredShips}
-              shipLimit={shipLimit}
-              initialFleet={convertedFleet}
-              onFleetReady={fleet => {
-                setError('')
-                socket?.emit('place_fleet', { roomId, fleet })
-              }}
-            />
+            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+              <FleetPlacer
+                boardSize={boardSize}
+                boardTiles={tiles}
+                availableShips={filteredShips}
+                shipLimit={shipLimit}
+                initialFleet={convertedFleet}
+                onFleetReady={fleet => {
+                  setError('')
+                  socket?.emit('place_fleet', { roomId, fleet })
+                }}
+                onFleetChange={setLocalPlacedShips}
+              />
+              <PlacedFleetSummary
+                placedShips={localPlacedShips}
+                availableShips={filteredShips}
+              />
+            </div>
           )}
         </>
       )}

@@ -29,7 +29,7 @@ function tileColor(tile) {
   }
 }
 
-export default function FleetPlacer({ boardSize, boardTiles, availableShips, shipLimit = 5, onFleetReady, initialFleet = [] }) {
+export default function FleetPlacer({ boardSize, boardTiles, availableShips, shipLimit = 5, onFleetReady, initialFleet = [], onFleetChange }) {
   // Base board (rocks from template, no ships)
   const [baseTiles, setBaseTiles] = useState(() => boardTiles?.map(r => [...r]) || [])
   const [placedShips, setPlacedShips] = useState(() => initialFleet.length > 0 ? initialFleet : [])
@@ -44,10 +44,24 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
 
   // Synchronize initialFleet when it changes (e.g., after getting it from server)
   useEffect(() => {
-    if (initialFleet.length > 0) {
-      setPlacedShips(initialFleet)
-    }
+    setPlacedShips(Array.isArray(initialFleet) ? initialFleet : [])
   }, [initialFleet])
+
+  // Notify parent of fleet changes for display purposes
+  useEffect(() => {
+    onFleetChange?.(placedShips)
+  }, [placedShips, onFleetChange])
+
+  useEffect(() => {
+    if (!selectedShip) return
+    const selectedId = String(selectedShip._id || selectedShip.id)
+    const stillAvailable = (availableShips || []).some((ship) => String(ship._id || ship.id) === selectedId)
+    if (!stillAvailable) {
+      setSelectedShip(null)
+      setHoverCell(null)
+      isDragging.current = false
+    }
+  }, [availableShips, selectedShip])
 
   // R key: rotate selected/dragged ship
   useEffect(() => {
@@ -118,6 +132,10 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
     placeShip(r, c)
   }
 
+  function handleShipDragEnd() {
+    isDragging.current = false
+  }
+
   function handleBoardDragLeave(e) {
     // only clear when leaving the whole board container
     if (!e.currentTarget.contains(e.relatedTarget)) {
@@ -164,6 +182,7 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
         onSelect={ship => { setSelectedShip(ship); setHoverCell(null) }}
         selectedShip={selectedShip}
         onDragStart={handleShipDragStart}
+        onDragEnd={handleShipDragEnd}
       />
 
       <div>
@@ -219,7 +238,7 @@ export default function FleetPlacer({ boardSize, boardTiles, availableShips, shi
 
         <div style={{ marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{placedShips.length}/{shipLimit} statek/statków ustawionych</span>
-          {placedShips.length === shipLimit && !selectedShip && (
+          {placedShips.length === shipLimit && (
             <button onClick={handleReady} style={readyBtnStyle}>✓ Gotowy!</button>
           )}
         </div>
