@@ -8,6 +8,7 @@ import ShipBuilderPage from './pages/ShipBuilderPage.jsx'
 import BoardBuilderPage from './pages/BoardBuilderPage.jsx'
 import GameSetupPage from './pages/GameSetupPage.jsx'
 import GamePage from './pages/GamePage.jsx'
+import ProfilePage from './pages/ProfilePage.jsx'
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="/" element={<ProtectedRoute><LobbyPage /></ProtectedRoute>} />
         <Route path="/ships" element={<ProtectedRoute><ShipBuilderPage /></ProtectedRoute>} />
         <Route path="/boards" element={<ProtectedRoute><BoardBuilderPage /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
         <Route path="/room/:roomId/setup" element={<ProtectedRoute><GameSetupPage /></ProtectedRoute>} />
         <Route path="/game/:gameId" element={<ProtectedRoute><GamePage /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />

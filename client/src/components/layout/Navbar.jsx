@@ -22,6 +22,7 @@ export default function Navbar() {
               <NavLink to="/">Lobby</NavLink>
               <NavLink to="/ships">My Ships</NavLink>
               <NavLink to="/boards">My Boards</NavLink>
+              <NavLink to="/profile">Profil</NavLink>
             </div>
           )}
         </div>

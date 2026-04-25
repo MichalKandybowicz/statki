@@ -57,6 +57,18 @@ const gameSchema = new mongoose.Schema({
     default: 'waiting',
   },
   winnerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  endReason: {
+    type: String,
+    enum: ['win', 'surrender', 'timeout'],
+    default: null,
+  },
+  finishedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  endedAt: { type: Date, default: null },
+}, {
+  timestamps: true,
 });
+
+gameSchema.index({ players: 1, status: 1, endedAt: -1 });
+gameSchema.index({ winnerId: 1, endedAt: -1 });
 
 module.exports = mongoose.model('Game', gameSchema);

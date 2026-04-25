@@ -113,4 +113,10 @@ export const boards = {
   unfavorite: (id) => axiosInstance.delete(`/boards/${id}/favorite`),
 }
 
+export const stats = {
+  history: (params = {}) => axiosInstance.get('/stats/history', { params }),
+  searchPlayers: (q) => axiosInstance.get('/stats/players/search', { params: { q } }),
+  headToHead: (opponentId) => axiosInstance.get(`/stats/head-to-head/${opponentId}`),
+}
+
 export default axiosInstance

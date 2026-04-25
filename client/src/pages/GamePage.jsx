@@ -8,6 +8,7 @@ import FleetPanel from '../components/game/FleetPanel.jsx'
 import AbilityPanel from '../components/game/AbilityPanel.jsx'
 import TurnTimer from '../components/game/TurnTimer.jsx'
 import { getAbilityInfo, formatCooldownTurns } from '../utils/abilityInfo.js'
+import { stats as statsApi } from '../services/api.js'
 
 const SOUND_SETTINGS_KEY = 'statki:sound-settings:v2'
 const BATTLE_LAYOUT_KEY = 'statki:battle-layout:v1'
@@ -52,12 +53,13 @@ export default function GamePage() {
    const [selectedShipIndex, setSelectedShipIndex] = useState(0)
    const [linearDirection, setLinearDirection] = useState('horizontal')
    const [linearHoverStart, setLinearHoverStart] = useState(null)
-   const [battleLog, setBattleLog] = useState([])
+   const [, setBattleLog] = useState([])
    const [showSoundMenu, setShowSoundMenu] = useState(false)
    const [soundSettings, setSoundSettings] = useState(DEFAULT_SOUND_SETTINGS)
    const [battleLayout, setBattleLayout] = useState(DEFAULT_BATTLE_LAYOUT)
    const [watchingPlayerId, setWatchingPlayerId] = useState(null)
    const [swapBoards, setSwapBoards] = useState(false)
+   const [headToHeadAfterBattle, setHeadToHeadAfterBattle] = useState(null)
   const previousTurnRef = useRef(null)
   const pendingEffectTimeoutsRef = useRef([])
   const pendingEffectsUntilRef = useRef(0)
@@ -378,8 +380,6 @@ export default function GamePage() {
    const selectedShip = myFleet?.[selectedShipIndex] || null
    const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
    
-   // Plansze wszystkich graczy
-   const allPlayerIds = myId ? Object.keys(boards) : []
    const watchedBoard = watchingPlayerId ? boards[watchingPlayerId] : null
    const isWatchingOwnBoard = watchingPlayerId === myId
 
@@ -394,6 +394,27 @@ export default function GamePage() {
   useEffect(() => {
     return () => clearPendingEffects()
   }, [clearPendingEffects])
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadPostBattleH2H() {
+      if (!isGameOver || !enemyId) {
+        if (mounted) setHeadToHeadAfterBattle(null)
+        return
+      }
+      try {
+        const res = await statsApi.headToHead(enemyId)
+        if (!mounted) return
+        setHeadToHeadAfterBattle(res.data)
+      } catch {
+        if (mounted) setHeadToHeadAfterBattle(null)
+      }
+    }
+
+    loadPostBattleH2H()
+    return () => { mounted = false }
+  }, [isGameOver, enemyId])
 
   useEffect(() => {
     if (!myFleet?.length) return
@@ -492,23 +513,6 @@ export default function GamePage() {
          <h3 style={{ color:'#64748b', fontSize:'0.75rem', fontWeight:'700', textTransform:'uppercase', letterSpacing:'0.06em', margin:0 }}>
            {isWatchingOwnBoard ? 'TWOJA PLANSZA' : 'OBSERWACJA'}
          </h3>
-         {allPlayerIds.length > 1 && (
-           <select
-             value={watchingPlayerId || ''}
-             onChange={e => setWatchingPlayerId(e.target.value)}
-             style={{
-               background:'rgba(37,99,235,0.15)',
-               color:'#60a5fa',
-               border:'1px solid rgba(37,99,235,0.3)',
-               borderRadius:'5px',
-               padding:'4px 8px',
-               fontSize:'0.75rem',
-               cursor:'pointer',
-               fontWeight:'600',
-             }}
-           >
-           </select>
-         )}
        </div>
        {watchedBoard && <GameBoard tiles={watchedBoard} isOwnBoard={isWatchingOwnBoard} boardSize={boardSize} sonarPositions={isWatchingOwnBoard ? ownSonarPositions : []} maxBoardPx={ownBoardMaxPx} />}
      </div>
@@ -597,6 +601,14 @@ export default function GamePage() {
             <div style={{ fontSize:'3.5rem', marginBottom:'12px' }}>{iWon ? '🏆' : '💀'}</div>
             <h2 style={{ color:'#e2e8f0', fontSize:'1.8rem', marginBottom:'8px' }}>{iWon ? 'Zwycięstwo!' : 'Porażka'}</h2>
             <p style={{ color:'#64748b', marginBottom:'28px' }}>{iWon ? 'Zatopiłeś wszystkie statki przeciwnika!' : 'Twoja flota została zniszczona.'}</p>
+            {headToHeadAfterBattle && (
+              <div style={{ marginBottom:'18px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 14px' }}>
+                <div style={{ color:'#94a3b8', fontSize:'0.78rem', marginBottom:'4px' }}>Bilans z {headToHeadAfterBattle.opponent?.username || 'przeciwnikiem'}</div>
+                <div style={{ color:'#e2e8f0', fontSize:'0.95rem', fontWeight:700 }}>
+                  {headToHeadAfterBattle.wins}W - {headToHeadAfterBattle.losses}L (mecze: {headToHeadAfterBattle.total})
+                </div>
+              </div>
+            )}
             <button onClick={() => { clearGame(); navigate('/') }} style={{ background:'#2563eb', color:'white', border:'none', borderRadius:'8px', padding:'12px 28px', fontWeight:'700', cursor:'pointer', fontSize:'1rem' }}>Powrót do lobby</button>
           </div>
         </div>

@@ -40,6 +40,14 @@ function emitTurnUpdateToPlayers(io, connectedUsers, game, turnPlayerId) {
   }
 }
 
+function markGameAsFinished(game, { winnerId = null, endReason = 'win', finishedBy = null } = {}) {
+  game.status = 'finished';
+  game.winnerId = winnerId || null;
+  game.endReason = endReason;
+  game.finishedBy = finishedBy || null;
+  game.endedAt = new Date();
+}
+
 async function closeRoomAfterGame(io, roomId) {
   const roomIdStr = roomId.toString();
   stagedFleets.delete(roomIdStr);
@@ -71,8 +79,11 @@ function scheduleTurnTimer(io, connectedUsers, turnTimers, game, room) {
 
       if (lost) {
         const winnerId = freshGame.players.find((p) => p.toString() !== currentPlayerId);
-        freshGame.status = 'finished';
-        freshGame.winnerId = winnerId;
+        markGameAsFinished(freshGame, {
+          winnerId,
+          endReason: 'timeout',
+          finishedBy: currentPlayerId,
+        });
         await freshGame.save();
 
         await closeRoomAfterGame(io, freshGame.roomId);
@@ -269,8 +280,11 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       const winnerId = checkWinCondition(game);
 
       if (winnerId) {
-        game.status = 'finished';
-        game.winnerId = winnerId;
+        markGameAsFinished(game, {
+          winnerId,
+          endReason: 'win',
+          finishedBy: userId,
+        });
         await game.save();
 
         await closeRoomAfterGame(io, game.roomId);
@@ -425,8 +439,11 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
 
       const winnerId = checkWinCondition(game);
       if (winnerId) {
-        game.status = 'finished';
-        game.winnerId = winnerId;
+        markGameAsFinished(game, {
+          winnerId,
+          endReason: 'win',
+          finishedBy: userId,
+        });
         await game.save();
         await closeRoomAfterGame(io, game.roomId);
         clearTurnTimer(turnTimers, gameId);
@@ -484,8 +501,11 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       if (!isPlayer) return socket.emit('error', { message: 'Not a player in this game' });
 
       const winnerId = game.players.find(p => p.toString() !== userId);
-      game.status = 'finished';
-      game.winnerId = winnerId;
+      markGameAsFinished(game, {
+        winnerId,
+        endReason: 'surrender',
+        finishedBy: userId,
+      });
       await game.save();
 
       clearTurnTimer(turnTimers, gameId);

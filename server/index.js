@@ -13,6 +13,7 @@ const authRoutes = require('./src/routes/auth');
 const roomRoutes = require('./src/routes/rooms');
 const shipRoutes = require('./src/routes/ships');
 const boardRoutes = require('./src/routes/boards');
+const statsRoutes = require('./src/routes/stats');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -67,6 +68,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/ships', shipRoutes);
 app.use('/api/boards', boardRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 404 handler
 app.use((req, res) => {
