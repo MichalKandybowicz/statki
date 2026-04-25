@@ -5,13 +5,14 @@ function getAbilityRules(type, size = 1) {
     case 'linear':
       return {
         minSize: 2,
+        maxSize: 6,
         cooldown: normalizedSize + 1,
         segmentLength: normalizedSize,
       };
     case 'diagonal':
       return {
-        minSize: 3,
-        maxSize: 5,
+        minSize: 2,
+        maxSize: 6,
         cooldown: normalizedSize + 1,
         segmentLength: normalizedSize,
       };
@@ -31,7 +32,7 @@ function getAbilityRules(type, size = 1) {
       const scanCount = Math.ceil(normalizedSize / 3);
       return {
         minSize: 1,
-        cooldown: (scanCount * 3) +1,
+        cooldown: (scanCount * 3) + 1,
         scanCount,
       };
     }
@@ -39,7 +40,7 @@ function getAbilityRules(type, size = 1) {
       return {
         minSize: 4,
         maxSize: 6,
-        cooldown: normalizedSize + 3,
+        cooldown: normalizedSize + 4,
       };
     case 'holy_bomb':
       return {
@@ -50,8 +51,8 @@ function getAbilityRules(type, size = 1) {
     case 'ship_shape':
       return {
         minSize: 2,
-        maxSize: 6,
-        cooldown: normalizedSize,
+        maxSize: 5,
+        cooldown: normalizedSize + 2,
       };
     default:
       return {
