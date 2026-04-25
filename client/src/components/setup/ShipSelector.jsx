@@ -35,6 +35,7 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
           const isSelected = id === selId
           const cells = ship.shape?.flat().filter(v => v === 1).length || 0
           const ability = getAbilityInfo(ship.abilityType, ship.size || cells)
+          const ownerName = ship.owner?.username || ship.owner?.email?.split('@')[0] || ''
           return (
             <div
               key={id}
@@ -60,6 +61,9 @@ export default function ShipSelector({ ships, onSelect, selectedShip, onDragStar
                   {favoriteShipIds.has(String(id)) ? '★ ' : ''}{ship.name || 'Nienazwany statek'}
                 </div>
                 <div style={{ color: '#94a3b8', fontSize: '0.72rem', marginBottom: '2px' }}>{cells} pól · {ability.label}</div>
+                {!ship.isOwn && ownerName && (
+                  <div style={{ color: '#64748b', fontSize: '0.68rem', marginBottom: '2px' }}>Autor: {ownerName}</div>
+                )}
                 <div style={{ color: '#fbbf24', fontSize: '0.68rem', marginBottom: '3px' }}>CD: {formatCooldownTurns(ability.cooldown)}</div>
                 <div style={{ color: '#64748b', fontSize: '0.68rem', lineHeight: 1.4 }}>{ability.description}</div>
               </div>

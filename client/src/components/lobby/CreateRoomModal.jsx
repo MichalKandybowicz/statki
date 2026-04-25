@@ -13,23 +13,39 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   const [communityBoards, setCommunityBoards] = useState([])
   const [boardQuery, setBoardQuery] = useState('')
   const [boardsLoading, setBoardsLoading] = useState(true)
+  const [boardsError, setBoardsError] = useState('')
+
+  async function loadBoardCatalog(query = '') {
+    setBoardsLoading(true)
+    setBoardsError('')
+    const [ownRes, communityRes] = await Promise.allSettled([
+      boardsApi.list(),
+      boardsApi.listCommunity({ q: query || undefined }),
+    ])
+
+    const ownList = ownRes.status === 'fulfilled' ? (Array.isArray(ownRes.value.data) ? ownRes.value.data : []) : []
+    const communityList = communityRes.status === 'fulfilled' ? (Array.isArray(communityRes.value.data) ? communityRes.value.data : []) : []
+
+    setOwnBoards(ownList)
+    setCommunityBoards(communityList)
+
+    if (ownRes.status !== 'fulfilled' && communityRes.status !== 'fulfilled') {
+      setBoardsError('Nie udało się pobrać listy map. Spróbuj odświeżyć listę.')
+    }
+
+    setBoardsLoading(false)
+  }
 
   useEffect(() => {
     let mounted = true
-    setBoardsLoading(true)
-    boardsApi.list()
-      .then(res => {
-        if (!mounted) return
-        const list = Array.isArray(res.data) ? res.data : []
-        setOwnBoards(list)
-        if (list.length > 0 && !boardTemplateId) setBoardTemplateId(String(list[0]._id || list[0].id))
-      })
-      .catch(() => {
-        if (mounted) setOwnBoards([])
-      })
-      .finally(() => {
-        if (mounted) setBoardsLoading(false)
-      })
+    loadBoardCatalog().catch(() => {
+      if (mounted) {
+        setOwnBoards([])
+        setCommunityBoards([])
+        setBoardsError('Nie udało się pobrać listy map. Spróbuj odświeżyć listę.')
+        setBoardsLoading(false)
+      }
+    })
 
     return () => { mounted = false }
   }, [])
@@ -38,11 +54,17 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     let active = true
     const tid = setTimeout(async () => {
       try {
+        setBoardsError('')
         const res = await boardsApi.listCommunity({ q: boardQuery.trim() || undefined })
         if (!active) return
         setCommunityBoards(Array.isArray(res.data) ? res.data : [])
       } catch {
-        if (active) setCommunityBoards([])
+        if (active) {
+          setCommunityBoards([])
+          if (ownBoards.length === 0) {
+            setBoardsError('Nie udało się pobrać map społeczności.')
+          }
+        }
       }
     }, 250)
 
@@ -50,7 +72,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
       active = false
       clearTimeout(tid)
     }
-  }, [boardQuery])
+  }, [boardQuery, ownBoards.length])
 
   const allBoards = useMemo(() => {
     const map = new Map()
@@ -137,6 +159,17 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
 
         {boardsLoading ? (
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Ładowanie plansz…</p>
+        ) : boardsError ? (
+          <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
+            <div style={{ marginBottom: '8px' }}>{boardsError}</div>
+            <button
+              type='button'
+              onClick={() => loadBoardCatalog(boardQuery.trim()).catch(() => {})}
+              style={{ background: 'rgba(37,99,235,0.15)', color: '#93c5fd', border: '1px solid rgba(37,99,235,0.3)', borderRadius: '7px', padding: '8px 12px', cursor: 'pointer', fontSize: '0.82rem' }}
+            >
+              Odśwież listę map
+            </button>
+          </div>
         ) : allBoards.length === 0 ? (
           <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
             Brak dostępnych plansz. <a href="/boards" style={{ color: '#60a5fa' }}>Stwórz planszę</a> albo dodaj ulubione mapy społeczności.

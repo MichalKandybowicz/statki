@@ -235,9 +235,9 @@ function registerRoomHandlers(io, socket, connectedUsers, turnTimers) {
       }
 
       const BoardTemplate = require('../models/BoardTemplate');
-      const tmpl = await BoardTemplate.findOne({ _id: boardTemplateId, ownerId: userId });
+      const tmpl = await BoardTemplate.findById(boardTemplateId);
       if (!tmpl) {
-        return socket.emit('error', { message: 'Board template not found or not yours' });
+        return socket.emit('error', { message: 'Board template not found' });
       }
 
       room.settings.boardTemplateId = tmpl._id;

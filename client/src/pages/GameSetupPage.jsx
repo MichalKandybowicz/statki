@@ -15,29 +15,56 @@ export default function GameSetupPage() {
   const { user } = useAuth()
 
   const [room, setRoom] = useState(null)
-  const [ships, setShips] = useState([])
+  const [ownShips, setOwnShips] = useState([])
+  const [communityShips, setCommunityShips] = useState([])
   const [boardTiles, setBoardTiles] = useState(null)
   const [error, setError] = useState('')
   const [boardLoading, setBoardLoading] = useState(true)
   const [startingGame, setStartingGame] = useState(false)
-  const [myBoards, setMyBoards] = useState([])
+  const [availableBoards, setAvailableBoards] = useState([])
   const [showMapPicker, setShowMapPicker] = useState(false)
   const [changingMap, setChangingMap] = useState(false)
   const [myFleet, setMyFleet] = useState([])
   const [shipLimitInput, setShipLimitInput] = useState(5)
+  const [shipSearch, setShipSearch] = useState('')
+  const [shipAbilityFilter, setShipAbilityFilter] = useState('all')
+  const [includeCommunityShips, setIncludeCommunityShips] = useState(true)
 
   useEffect(() => {
     roomsApi.get(roomId)
       .then(res => setRoom(res.data))
       .catch(err => setError(err.response?.data?.error || 'Nie udało się pobrać pokoju'))
 
-    shipsApi.list()
-      .then(res => setShips(res.data || []))
-      .catch(() => setShips([]))
+    Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
+      .then(([ownRes, communityRes]) => {
+        setOwnShips(ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : [])
+        setCommunityShips(communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : [])
+      })
+      .catch(() => {
+        setOwnShips([])
+        setCommunityShips([])
+      })
 
-    boardsApi.list()
-      .then(res => setMyBoards(res.data || []))
-      .catch(() => setMyBoards([]))
+    Promise.allSettled([boardsApi.list(), boardsApi.listCommunity()])
+      .then(([ownRes, communityRes]) => {
+        const own = ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : []
+        const community = communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : []
+        const map = new Map()
+
+        own.forEach((b) => {
+          const id = String(b._id || b.id)
+          if (!id) return
+          map.set(id, { ...b, source: 'own' })
+        })
+        community.forEach((b) => {
+          const id = String(b._id || b.id)
+          if (!id || map.has(id)) return
+          map.set(id, { ...b, source: 'community' })
+        })
+
+        setAvailableBoards(Array.from(map.values()))
+      })
+      .catch(() => setAvailableBoards([]))
   }, [roomId])
 
   useEffect(() => {
@@ -107,6 +134,33 @@ export default function GameSetupPage() {
   const boardSize = room?.settings?.boardSize || 10
   const shipLimit = room?.settings?.shipLimit || 5
   const tiles = boardTiles || createEmptyBoard(boardSize)
+
+  const availableShips = useMemo(() => {
+    const map = new Map()
+    for (const ship of ownShips || []) {
+      const id = String(ship._id || ship.id)
+      if (!id) continue
+      map.set(id, { ...ship, isOwn: true })
+    }
+    if (includeCommunityShips) {
+      for (const ship of communityShips || []) {
+        const id = String(ship._id || ship.id)
+        if (!id || map.has(id)) continue
+        map.set(id, { ...ship, isOwn: false })
+      }
+    }
+    return Array.from(map.values())
+  }, [ownShips, communityShips, includeCommunityShips])
+
+  const filteredShips = useMemo(() => {
+    const q = shipSearch.trim().toLowerCase()
+    return availableShips.filter((ship) => {
+      if (shipAbilityFilter !== 'all' && ship.abilityType !== shipAbilityFilter) return false
+      if (!q) return true
+      const ownerName = ship.owner?.username || ship.owner?.email?.split('@')[0] || ''
+      return (ship.name || '').toLowerCase().includes(q) || ownerName.toLowerCase().includes(q)
+    })
+  }, [availableShips, shipSearch, shipAbilityFilter])
 
   const convertedFleet = useMemo(
     () => myFleet.map(ship => ({
@@ -302,11 +356,14 @@ export default function GameSetupPage() {
                </button>
                {showMapPicker && (
                 <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {myBoards.length === 0 ? (
+                  {availableBoards.length === 0 ? (
                     <p style={{ color: '#64748b', fontSize: '0.8rem', margin: 0 }}>Brak dostępnych map.</p>
-                  ) : myBoards.map(b => {
+                  ) : availableBoards.map(b => {
                     const bid = b._id || b.id
                     const isActive = (room?.settings?.boardTemplateId === bid || room?.settings?.boardTemplateId?._id === bid || room?.settings?.boardTemplateId?.toString() === bid)
+                    const ownerLabel = b.source === 'own'
+                      ? 'Twoja mapa'
+                      : `Autor: ${b.owner?.username || b.owner?.email?.split('@')[0] || 'społeczność'}`
                     return (
                       <button
                         key={bid}
@@ -325,6 +382,7 @@ export default function GameSetupPage() {
                         }}
                       >
                         {b.name || `Mapa ${(bid || '').slice(-5)}`} — {b.size || b.boardSize || '?'}×{b.size || b.boardSize || '?'}
+                        {' · '}{ownerLabel}
                         {isActive && ' ✓'}
                       </button>
                     )
@@ -348,26 +406,60 @@ export default function GameSetupPage() {
 
       {boardLoading ? (
         <div style={infoBoxStyle}>Ładowanie planszy…</div>
-      ) : ships.length === 0 ? (
+      ) : availableShips.length === 0 ? (
         <div style={infoBoxStyle}>
-          Nie masz żadnych statków. <a href="/ships">Stwórz je najpierw</a>, a potem wróć tutaj.
+          Brak dostępnych statków. <a href="/ships">Stwórz własne</a> albo włącz statki społeczności.
         </div>
       ) : isReady ? (
         <div style={infoBoxStyle}>
           ✓ Twoja flota została zatwierdzona. {canStartGame ? 'Możesz rozpocząć grę.' : 'Czekaj na drugiego gracza lub na start hosta.'}
         </div>
       ) : (
-        <FleetPlacer
-          boardSize={boardSize}
-          boardTiles={tiles}
-          availableShips={ships}
-          shipLimit={shipLimit}
-          initialFleet={convertedFleet}
-          onFleetReady={fleet => {
-            setError('')
-            socket?.emit('place_fleet', { roomId, fleet })
-          }}
-        />
+        <>
+          <div style={{ marginBottom:'12px', display:'grid', gridTemplateColumns:'minmax(200px, 1fr) minmax(180px, 220px) auto', gap:'8px', alignItems:'center' }}>
+            <input
+              value={shipSearch}
+              onChange={(e) => setShipSearch(e.target.value)}
+              placeholder='Szukaj statku po nazwie/autorze...'
+              style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
+            />
+            <select
+              value={shipAbilityFilter}
+              onChange={(e) => setShipAbilityFilter(e.target.value)}
+              style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
+            >
+              <option value='all'>Wszystkie umiejętności</option>
+              <option value='linear'>Liniowa</option>
+              <option value='diagonal'>Skośna</option>
+              <option value='random'>Losowa</option>
+              <option value='target'>Precyzyjna</option>
+              <option value='sonar'>Sonar</option>
+              <option value='scout_rocket'>Rakieta zwiadowcza</option>
+              <option value='holy_bomb'>Święta bomba</option>
+              <option value='ship_shape'>Kształt statku</option>
+            </select>
+            <label style={{ display:'flex', alignItems:'center', gap:'6px', color:'#cbd5e1', fontSize:'0.82rem', whiteSpace:'nowrap' }}>
+              <input type='checkbox' checked={includeCommunityShips} onChange={(e) => setIncludeCommunityShips(e.target.checked)} />
+              Statki społeczności
+            </label>
+          </div>
+
+          {filteredShips.length === 0 ? (
+            <div style={infoBoxStyle}>Brak statków spełniających aktualne filtry.</div>
+          ) : (
+            <FleetPlacer
+              boardSize={boardSize}
+              boardTiles={tiles}
+              availableShips={filteredShips}
+              shipLimit={shipLimit}
+              initialFleet={convertedFleet}
+              onFleetReady={fleet => {
+                setError('')
+                socket?.emit('place_fleet', { roomId, fleet })
+              }}
+            />
+          )}
+        </>
       )}
     </div>
   )

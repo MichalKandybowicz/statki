@@ -255,12 +255,12 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         });
       }
 
-      // Resolve ship templates and validate
+      // Resolve ship templates and validate (można używać także szablonów społeczności)
       const resolvedFleet = [];
       for (const item of fleet) {
-        const ship = await ShipTemplate.findOne({ _id: item.shipTemplateId, ownerId: userId });
+        const ship = await ShipTemplate.findById(item.shipTemplateId);
         if (!ship) {
-          return socket.emit('error', { message: `Ship template ${item.shipTemplateId} not found in your collection` });
+          return socket.emit('error', { message: `Ship template ${item.shipTemplateId} not found` });
         }
         resolvedFleet.push({
           shipTemplateId: ship._id,
