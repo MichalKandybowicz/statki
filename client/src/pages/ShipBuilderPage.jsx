@@ -35,17 +35,21 @@ export default function ShipBuilderPage() {
 
   async function loadShips() {
     try {
+      console.log('[ShipBuilderPage] loading own ships...')
       const res = await shipsApi.list()
       setSavedShips(res.data || [])
       setCatalogError('')
+      console.log('[ShipBuilderPage] own ships loaded', { count: Array.isArray(res.data) ? res.data.length : 0 })
     } catch {
       setSavedShips([])
       setCatalogError('Nie udało się pobrać Twoich statków.')
+      console.error('[ShipBuilderPage] failed to load own ships')
     }
   }
 
   async function loadCommunityShips() {
     try {
+      console.log('[ShipBuilderPage] loading community ships...', { filters: communityFilters })
       const params = {}
       if (communityFilters.name.trim()) params.name = communityFilters.name.trim()
       if (communityFilters.abilityType !== 'all') params.abilityType = communityFilters.abilityType
@@ -56,9 +60,11 @@ export default function ShipBuilderPage() {
       // Endpoint już filtruje ownerId, ale zostawiamy bezpiecznik po stronie UI.
       setCommunityShips(ships.filter(ship => !ship.isOwn))
       setCatalogError(prev => prev === 'Nie udało się pobrać statków społeczności.' ? '' : prev)
+      console.log('[ShipBuilderPage] community ships loaded', { count: ships.filter(ship => !ship.isOwn).length })
     } catch {
       setCommunityShips([])
       setCatalogError(prev => prev || 'Nie udało się pobrać statków społeczności.')
+      console.error('[ShipBuilderPage] failed to load community ships')
     }
   }
 

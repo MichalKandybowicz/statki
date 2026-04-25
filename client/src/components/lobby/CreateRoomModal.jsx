@@ -18,6 +18,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   async function loadBoardCatalog(query = '') {
     setBoardsLoading(true)
     setBoardsError('')
+    console.log('[CreateRoomModal] loading board catalog...', { query })
     const [ownRes, communityRes] = await Promise.allSettled([
       boardsApi.list(),
       boardsApi.listCommunity({ q: query || undefined }),
@@ -26,11 +27,22 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     const ownList = ownRes.status === 'fulfilled' ? (Array.isArray(ownRes.value.data) ? ownRes.value.data : []) : []
     const communityList = communityRes.status === 'fulfilled' ? (Array.isArray(communityRes.value.data) ? communityRes.value.data : []) : []
 
+    console.log('[CreateRoomModal] board catalog result', {
+      ownStatus: ownRes.status,
+      ownCount: ownList.length,
+      communityStatus: communityRes.status,
+      communityCount: communityList.length,
+    })
+
     setOwnBoards(ownList)
     setCommunityBoards(communityList)
 
     if (ownRes.status !== 'fulfilled' && communityRes.status !== 'fulfilled') {
       setBoardsError('Nie udało się pobrać listy map. Spróbuj odświeżyć listę.')
+      console.error('[CreateRoomModal] both board requests failed', {
+        ownReason: ownRes.reason,
+        communityReason: communityRes.reason,
+      })
     }
 
     setBoardsLoading(false)
@@ -55,12 +67,15 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     const tid = setTimeout(async () => {
       try {
         setBoardsError('')
+        console.log('[CreateRoomModal] loading community boards for search...', { query: boardQuery.trim() })
         const res = await boardsApi.listCommunity({ q: boardQuery.trim() || undefined })
         if (!active) return
         setCommunityBoards(Array.isArray(res.data) ? res.data : [])
+        console.log('[CreateRoomModal] community board search result', { count: Array.isArray(res.data) ? res.data.length : 0 })
       } catch {
         if (active) {
           setCommunityBoards([])
+          console.error('[CreateRoomModal] failed to load community boards for search')
           if (ownBoards.length === 0) {
             setBoardsError('Nie udało się pobrać map społeczności.')
           }

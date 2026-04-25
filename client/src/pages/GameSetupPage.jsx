@@ -64,18 +64,33 @@ export default function GameSetupPage() {
   async function loadShipsCatalog() {
     setShipsLoading(true)
     setShipsLoadError('')
+    console.log('[GameSetupPage] loading ships catalog...')
     const [ownRes, communityRes] = await Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
 
     const own = ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : []
     const community = communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : []
+
+    console.log('[GameSetupPage] ships catalog result', {
+      ownStatus: ownRes.status,
+      ownCount: own.length,
+      communityStatus: communityRes.status,
+      communityCount: community.length,
+    })
 
     setOwnShips(own)
     setCommunityShips(community)
 
     if (ownRes.status !== 'fulfilled' && communityRes.status !== 'fulfilled') {
       setShipsLoadError('Nie udało się pobrać listy statków. Odśwież listę i spróbuj ponownie.')
+      console.error('[GameSetupPage] both ship requests failed', {
+        ownReason: ownRes.reason,
+        communityReason: communityRes.reason,
+      })
     } else if (ownRes.status !== 'fulfilled') {
       setShipsLoadError('Nie udało się pobrać Twoich statków. Możesz nadal użyć statków społeczności.')
+      console.warn('[GameSetupPage] own ships failed, community ships still available', {
+        ownReason: ownRes.reason,
+      })
     }
 
     setShipsLoading(false)

@@ -9,6 +9,17 @@ const axiosInstance = axios.create({
 let isRefreshing = false
 let failedQueue = []
 
+function shouldLogRequest(url = '') {
+  return ['/ships', '/boards', '/rooms'].some(prefix => String(url).startsWith(prefix))
+}
+
+function logApi(level, { method, url, status = '', durationMs = null, message = '' }) {
+  const statusPart = status ? ` ${status}` : ''
+  const durationPart = durationMs != null ? ` · ${durationMs}ms` : ''
+  const messagePart = message ? ` · ${message}` : ''
+  console[level](`[API] ${method} ${url}${statusPart}${durationPart}${messagePart}`)
+}
+
 function processQueue(error, token = null) {
   failedQueue.forEach(prom => {
     if (error) {
@@ -25,11 +36,33 @@ axiosInstance.interceptors.request.use(config => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+  config.metadata = {
+    ...(config.metadata || {}),
+    startedAt: Date.now(),
+  }
+  if (shouldLogRequest(config.url)) {
+    logApi('log', {
+      method: (config.method || 'GET').toUpperCase(),
+      url: config.url,
+      message: 'start',
+    })
+  }
   return config
 })
 
 axiosInstance.interceptors.response.use(
-  response => response,
+  response => {
+    if (shouldLogRequest(response.config?.url)) {
+      logApi('log', {
+        method: (response.config?.method || 'GET').toUpperCase(),
+        url: response.config?.url,
+        status: response.status,
+        durationMs: Math.max(0, Date.now() - (response.config?.metadata?.startedAt || Date.now())),
+        message: 'ok',
+      })
+    }
+    return response
+  },
   async error => {
     const originalRequest = error.config
 
@@ -70,6 +103,16 @@ axiosInstance.interceptors.response.use(
       } finally {
         isRefreshing = false
       }
+    }
+
+    if (shouldLogRequest(originalRequest?.url)) {
+      logApi('error', {
+        method: (originalRequest?.method || 'GET').toUpperCase(),
+        url: originalRequest?.url,
+        status: error.response?.status || '',
+        durationMs: originalRequest?.metadata?.startedAt ? Math.max(0, Date.now() - originalRequest.metadata.startedAt) : null,
+        message: error.response?.data?.error || error.message || 'request failed',
+      })
     }
 
     return Promise.reject(error)
