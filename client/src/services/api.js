@@ -105,12 +105,14 @@ export const ships = {
 
 export const boards = {
   list: () => axiosInstance.get('/boards'),
+  listCommunity: (params = {}) => axiosInstance.get('/boards/community', { params }),
   get: (id) => axiosInstance.get(`/boards/${id}`),
   create: (data) => axiosInstance.post('/boards', data),
   update: (id, data) => axiosInstance.put(`/boards/${id}`, data),
   delete: (id) => axiosInstance.delete(`/boards/${id}`),
   favorite: (id) => axiosInstance.post(`/boards/${id}/favorite`),
   unfavorite: (id) => axiosInstance.delete(`/boards/${id}/favorite`),
+  copy: (id, data = {}) => axiosInstance.post(`/boards/${id}/copy`, data),
 }
 
 export const stats = {

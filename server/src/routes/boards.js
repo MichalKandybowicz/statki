@@ -34,6 +34,10 @@ function validateBoardName(name) {
   return null;
 }
 
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 // GET /api/boards
 router.get('/', async (req, res) => {
   try {
@@ -41,6 +45,51 @@ router.get('/', async (req, res) => {
     res.json(boards);
   } catch (err) {
     console.error('List boards error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/boards/community?q=
+router.get('/community', async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const query = { ownerId: { $ne: req.user._id } };
+
+    if (q.length >= 1) {
+      const safe = new RegExp(escapeRegex(q), 'i');
+      const users = await User.find({
+        _id: { $ne: req.user._id },
+        $or: [{ username: safe }, { email: safe }],
+      })
+        .select('_id')
+        .limit(100)
+        .lean();
+
+      query.$or = [
+        { name: { $regex: safe } },
+        { ownerId: { $in: users.map((u) => u._id) } },
+      ];
+    }
+
+    const boards = await BoardTemplate.find(query)
+      .populate('ownerId', 'username email')
+      .sort({ _id: -1 })
+      .limit(200)
+      .lean();
+
+    res.json(
+      boards.map((board) => ({
+        ...board,
+        owner: {
+          _id: board.ownerId?._id,
+          username: board.ownerId?.username,
+          email: board.ownerId?.email,
+        },
+        isOwn: false,
+      }))
+    );
+  } catch (err) {
+    console.error('List community boards error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -170,6 +219,33 @@ router.delete('/:id/favorite', async (req, res) => {
     res.json({ favoriteBoards: user.favoriteBoards || [] });
   } catch (err) {
     console.error('Unfavorite board error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/boards/:id/copy
+router.post('/:id/copy', async (req, res) => {
+  try {
+    const sourceBoard = await BoardTemplate.findById(req.params.id).lean();
+    if (!sourceBoard) return res.status(404).json({ error: 'Board not found' });
+
+    const providedName = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const copyName = providedName || `${sourceBoard.name} (kopia)`;
+
+    const nameError = validateBoardName(copyName);
+    if (nameError) return res.status(400).json({ error: nameError });
+
+    const copiedBoard = new BoardTemplate({
+      ownerId: req.user._id,
+      name: copyName,
+      size: sourceBoard.size,
+      tiles: sourceBoard.tiles,
+    });
+    await copiedBoard.save();
+
+    res.status(201).json(copiedBoard);
+  } catch (err) {
+    console.error('Copy board error:', err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

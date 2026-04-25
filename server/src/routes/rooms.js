@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'isRanked must be a boolean' });
     }
 
-    const boardTemplate = await BoardTemplate.findOne({ _id: boardTemplateId, ownerId: req.user._id }).lean();
+    const boardTemplate = await BoardTemplate.findById(boardTemplateId).lean();
     if (!boardTemplate) {
       return res.status(404).json({ error: 'Board template not found' });
     }

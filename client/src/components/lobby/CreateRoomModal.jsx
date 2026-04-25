@@ -9,30 +9,106 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   const [password, setPassword] = useState('')
   const [isRanked, setIsRanked] = useState(false)
   const [boardTemplateId, setBoardTemplateId] = useState('')
-  const [availableBoards, setAvailableBoards] = useState([])
+  const [ownBoards, setOwnBoards] = useState([])
+  const [communityBoards, setCommunityBoards] = useState([])
+  const [boardQuery, setBoardQuery] = useState('')
   const [boardsLoading, setBoardsLoading] = useState(true)
 
   useEffect(() => {
-    boardsApi.list().then(res => {
-      const list = res.data || []
-      setAvailableBoards(list)
-      if (list.length > 0) setBoardTemplateId(list[0]._id || list[0].id)
-    }).catch(() => {}).finally(() => setBoardsLoading(false))
+    let mounted = true
+    setBoardsLoading(true)
+    boardsApi.list()
+      .then(res => {
+        if (!mounted) return
+        const list = Array.isArray(res.data) ? res.data : []
+        setOwnBoards(list)
+        if (list.length > 0 && !boardTemplateId) setBoardTemplateId(String(list[0]._id || list[0].id))
+      })
+      .catch(() => {
+        if (mounted) setOwnBoards([])
+      })
+      .finally(() => {
+        if (mounted) setBoardsLoading(false)
+      })
+
+    return () => { mounted = false }
   }, [])
 
-  const selectedBoard = availableBoards.find(b => (b._id || b.id) === boardTemplateId)
+  useEffect(() => {
+    let active = true
+    const tid = setTimeout(async () => {
+      try {
+        const res = await boardsApi.listCommunity({ q: boardQuery.trim() || undefined })
+        if (!active) return
+        setCommunityBoards(Array.isArray(res.data) ? res.data : [])
+      } catch {
+        if (active) setCommunityBoards([])
+      }
+    }, 250)
+
+    return () => {
+      active = false
+      clearTimeout(tid)
+    }
+  }, [boardQuery])
+
+  const allBoards = useMemo(() => {
+    const map = new Map()
+    for (const board of ownBoards || []) {
+      const id = String(board._id || board.id)
+      if (!id) continue
+      map.set(id, {
+        ...board,
+        owner: {
+          _id: user?._id,
+          username: user?.username,
+          email: user?.email,
+        },
+        source: 'own',
+      })
+    }
+    for (const board of communityBoards || []) {
+      const id = String(board._id || board.id)
+      if (!id || map.has(id)) continue
+      map.set(id, { ...board, source: 'community' })
+    }
+    return Array.from(map.values())
+  }, [ownBoards, communityBoards, user?._id, user?.username, user?.email])
+
+  useEffect(() => {
+    if (allBoards.length === 0) return
+    const hasCurrent = allBoards.some((b) => String(b._id || b.id) === String(boardTemplateId))
+    if (!hasCurrent) {
+      setBoardTemplateId(String(allBoards[0]._id || allBoards[0].id))
+    }
+  }, [allBoards, boardTemplateId])
+
+  const selectedBoard = allBoards.find(b => String(b._id || b.id) === String(boardTemplateId))
   const favoriteBoardIds = useMemo(
     () => new Set((user?.favoriteBoards || []).map(String)),
     [user?.favoriteBoards]
   )
+  const filteredBoards = useMemo(() => {
+    const q = boardQuery.trim().toLowerCase()
+    if (!q) return allBoards
+    return allBoards.filter((b) => {
+      const ownerName = b.owner?.username || b.owner?.email?.split('@')[0] || ''
+      return (b.name || '').toLowerCase().includes(q) || ownerName.toLowerCase().includes(q)
+    })
+  }, [allBoards, boardQuery])
   const orderedBoards = useMemo(
-    () => [...availableBoards].sort((a, b) => {
+    () => [...filteredBoards].sort((a, b) => {
       const aFav = favoriteBoardIds.has(String(a._id || a.id))
       const bFav = favoriteBoardIds.has(String(b._id || b.id))
-      if (aFav === bFav) return 0
-      return aFav ? -1 : 1
+      if (aFav !== bFav) return aFav ? -1 : 1
+      if (a.source !== b.source) return a.source === 'own' ? -1 : 1
+      const aName = (a.name || '').toLowerCase()
+      const bName = (b.name || '').toLowerCase()
+      if (aName < bName) return -1
+      if (aName > bName) return 1
+      return 0
     }),
-    [availableBoards, favoriteBoardIds]
+    [filteredBoards, favoriteBoardIds]
   )
 
   function handleSubmit(e) {
@@ -61,24 +137,33 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
 
         {boardsLoading ? (
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Ładowanie plansz…</p>
-        ) : availableBoards.length === 0 ? (
+        ) : allBoards.length === 0 ? (
           <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
-            Nie masz żadnych plansz. <a href="/boards" style={{ color: '#60a5fa' }}>Stwórz planszę</a>, a następnie wróć tutaj.
+            Brak dostępnych plansz. <a href="/boards" style={{ color: '#60a5fa' }}>Stwórz planszę</a> albo dodaj ulubione mapy społeczności.
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
             {/* Board picker */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Plansza</label>
+              <input
+                value={boardQuery}
+                onChange={(e) => setBoardQuery(e.target.value)}
+                style={{ ...inputStyle, marginBottom: '8px' }}
+                placeholder='Szukaj po nazwie planszy lub autorze...'
+              />
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {orderedBoards.map(b => {
                   const id = b._id || b.id
-                  const isSelected = id === boardTemplateId
+                  const isSelected = String(id) === String(boardTemplateId)
                   const isFavorite = favoriteBoardIds.has(String(id))
+                  const ownerName = b.source === 'own'
+                    ? (user?.username || user?.email?.split('@')[0] || 'Ty')
+                    : (b.owner?.username || b.owner?.email?.split('@')[0] || 'Społeczność')
                   return (
                     <div
                       key={id}
-                      onClick={() => setBoardTemplateId(id)}
+                      onClick={() => setBoardTemplateId(String(id))}
                       style={{
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '10px 14px', borderRadius: '8px', cursor: 'pointer',
@@ -87,13 +172,21 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
                         transition: 'all 0.15s',
                       }}
                     >
-                      <span style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
-                        {isFavorite ? '★ ' : ''}{b.name || `Plansza ${b.size}×${b.size}`}
-                      </span>
-                      <span style={{ color: '#475569', fontSize: '0.78rem' }}>{b.size}×{b.size}</span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ color: '#e2e8f0', fontSize: '0.9rem' }}>
+                          {isFavorite ? '★ ' : ''}{b.name || `Plansza ${b.size}×${b.size}`}
+                        </div>
+                        <div style={{ color: '#64748b', fontSize: '0.72rem' }}>
+                          {b.source === 'own' ? 'Twoja plansza' : `Autor: ${ownerName}`}
+                        </div>
+                      </div>
+                      <span style={{ color: '#475569', fontSize: '0.78rem', flexShrink: 0 }}>{b.size}×{b.size}</span>
                     </div>
                   )
                 })}
+                {orderedBoards.length === 0 && (
+                  <div style={{ color: '#64748b', fontSize: '0.82rem', padding: '8px 2px' }}>Brak wyników dla podanej frazy.</div>
+                )}
               </div>
             </div>
 
