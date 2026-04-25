@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { boards as boardsApi } from '../../services/api'
 import useAuth from '../../hooks/useAuth'
 
@@ -14,8 +14,11 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   const [boardQuery, setBoardQuery] = useState('')
   const [boardsLoading, setBoardsLoading] = useState(true)
   const [boardsError, setBoardsError] = useState('')
+  const latestCommunityRequestIdRef = useRef(0)
+  const baseCommunityBoardsRef = useRef([])
 
   async function loadBoardCatalog(query = '') {
+    const requestId = ++latestCommunityRequestIdRef.current
     setBoardsLoading(true)
     setBoardsError('')
     console.log('[CreateRoomModal] loading board catalog...', { query })
@@ -34,8 +37,14 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
       communityCount: communityList.length,
     })
 
+    if (requestId !== latestCommunityRequestIdRef.current) {
+      console.warn('[CreateRoomModal] ignoring stale board catalog response', { requestId })
+      return
+    }
+
     setOwnBoards(ownList)
     setCommunityBoards(communityList)
+    baseCommunityBoardsRef.current = communityList
 
     if (ownRes.status !== 'fulfilled' && communityRes.status !== 'fulfilled') {
       setBoardsError('Nie udało się pobrać listy map. Spróbuj odświeżyć listę.')
@@ -64,16 +73,25 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
 
   useEffect(() => {
     let active = true
+    const normalizedQuery = boardQuery.trim()
+
+    if (!normalizedQuery) {
+      setBoardsError('')
+      setCommunityBoards(baseCommunityBoardsRef.current)
+      return () => { active = false }
+    }
+
+    const requestId = ++latestCommunityRequestIdRef.current
     const tid = setTimeout(async () => {
       try {
         setBoardsError('')
-        console.log('[CreateRoomModal] loading community boards for search...', { query: boardQuery.trim() })
-        const res = await boardsApi.listCommunity({ q: boardQuery.trim() || undefined })
-        if (!active) return
+        console.log('[CreateRoomModal] loading community boards for search...', { query: normalizedQuery, requestId })
+        const res = await boardsApi.listCommunity({ q: normalizedQuery || undefined })
+        if (!active || requestId !== latestCommunityRequestIdRef.current) return
         setCommunityBoards(Array.isArray(res.data) ? res.data : [])
         console.log('[CreateRoomModal] community board search result', { count: Array.isArray(res.data) ? res.data.length : 0 })
       } catch {
-        if (active) {
+        if (active && requestId === latestCommunityRequestIdRef.current) {
           setCommunityBoards([])
           console.error('[CreateRoomModal] failed to load community boards for search')
           if (ownBoards.length === 0) {
