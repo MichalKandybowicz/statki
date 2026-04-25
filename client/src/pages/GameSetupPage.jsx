@@ -17,6 +17,8 @@ export default function GameSetupPage() {
   const [room, setRoom] = useState(null)
   const [ownShips, setOwnShips] = useState([])
   const [communityShips, setCommunityShips] = useState([])
+  const [shipsLoading, setShipsLoading] = useState(true)
+  const [shipsLoadError, setShipsLoadError] = useState('')
   const [boardTiles, setBoardTiles] = useState(null)
   const [error, setError] = useState('')
   const [boardLoading, setBoardLoading] = useState(true)
@@ -35,15 +37,7 @@ export default function GameSetupPage() {
       .then(res => setRoom(res.data))
       .catch(err => setError(err.response?.data?.error || 'Nie udało się pobrać pokoju'))
 
-    Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
-      .then(([ownRes, communityRes]) => {
-        setOwnShips(ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : [])
-        setCommunityShips(communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : [])
-      })
-      .catch(() => {
-        setOwnShips([])
-        setCommunityShips([])
-      })
+    loadShipsCatalog()
 
     Promise.allSettled([boardsApi.list(), boardsApi.listCommunity()])
       .then(([ownRes, communityRes]) => {
@@ -66,6 +60,26 @@ export default function GameSetupPage() {
       })
       .catch(() => setAvailableBoards([]))
   }, [roomId])
+
+  async function loadShipsCatalog() {
+    setShipsLoading(true)
+    setShipsLoadError('')
+    const [ownRes, communityRes] = await Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
+
+    const own = ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : []
+    const community = communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : []
+
+    setOwnShips(own)
+    setCommunityShips(community)
+
+    if (ownRes.status !== 'fulfilled' && communityRes.status !== 'fulfilled') {
+      setShipsLoadError('Nie udało się pobrać listy statków. Odśwież listę i spróbuj ponownie.')
+    } else if (ownRes.status !== 'fulfilled') {
+      setShipsLoadError('Nie udało się pobrać Twoich statków. Możesz nadal użyć statków społeczności.')
+    }
+
+    setShipsLoading(false)
+  }
 
   useEffect(() => {
     const templateId = room?.settings?.boardTemplateId
@@ -406,9 +420,20 @@ export default function GameSetupPage() {
 
       {boardLoading ? (
         <div style={infoBoxStyle}>Ładowanie planszy…</div>
+      ) : shipsLoading ? (
+        <div style={infoBoxStyle}>Ładowanie statków…</div>
       ) : availableShips.length === 0 ? (
         <div style={infoBoxStyle}>
-          Brak dostępnych statków. <a href="/ships">Stwórz własne</a> albo włącz statki społeczności.
+          {shipsLoadError || <>Brak dostępnych statków. <a href="/ships">Stwórz własne</a> albo włącz statki społeczności.</>}
+          <div style={{ marginTop: '8px' }}>
+            <button
+              type='button'
+              onClick={() => loadShipsCatalog().catch(() => setShipsLoadError('Nie udało się pobrać listy statków.'))}
+              style={{ background:'rgba(37,99,235,0.15)', color:'#93c5fd', border:'1px solid rgba(37,99,235,0.3)', borderRadius:'7px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}
+            >
+              Odśwież listę statków
+            </button>
+          </div>
         </div>
       ) : isReady ? (
         <div style={infoBoxStyle}>

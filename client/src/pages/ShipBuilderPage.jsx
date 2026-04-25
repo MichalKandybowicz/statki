@@ -22,6 +22,7 @@ export default function ShipBuilderPage() {
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState(null)
   const [copyingShipId, setCopyingShipId] = useState(null)
+  const [catalogError, setCatalogError] = useState('')
   const { user, refreshUser } = useAuth()
 
   useEffect(() => {
@@ -36,7 +37,11 @@ export default function ShipBuilderPage() {
     try {
       const res = await shipsApi.list()
       setSavedShips(res.data || [])
-    } catch {}
+      setCatalogError('')
+    } catch {
+      setSavedShips([])
+      setCatalogError('Nie udało się pobrać Twoich statków.')
+    }
   }
 
   async function loadCommunityShips() {
@@ -50,9 +55,16 @@ export default function ShipBuilderPage() {
       const ships = Array.isArray(res.data) ? res.data : []
       // Endpoint już filtruje ownerId, ale zostawiamy bezpiecznik po stronie UI.
       setCommunityShips(ships.filter(ship => !ship.isOwn))
+      setCatalogError(prev => prev === 'Nie udało się pobrać statków społeczności.' ? '' : prev)
     } catch {
       setCommunityShips([])
+      setCatalogError(prev => prev || 'Nie udało się pobrać statków społeczności.')
     }
+  }
+
+  async function retryCatalog() {
+    setCatalogError('')
+    await Promise.allSettled([loadShips(), loadCommunityShips()])
   }
 
   function toggle(r, c) {
@@ -162,6 +174,13 @@ export default function ShipBuilderPage() {
       <p style={{ color: '#64748b', marginBottom: '24px', fontSize: '0.92rem' }}>
         Zdefiniuj nazwę, kształt i specjalną umiejętność statku. Cooldown pokazuje, ile pełnych tur musi minąć po użyciu zdolności.
       </p>
+
+      {catalogError && (
+        <div style={{ marginBottom:'14px', background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#f87171', padding:'10px 12px', borderRadius:'8px', display:'flex', justifyContent:'space-between', gap:'10px', alignItems:'center' }}>
+          <span style={{ fontSize:'0.84rem' }}>{catalogError}</span>
+          <button type='button' onClick={retryCatalog} style={{ background:'rgba(37,99,235,0.15)', color:'#93c5fd', border:'1px solid rgba(37,99,235,0.3)', borderRadius:'6px', padding:'6px 10px', cursor:'pointer', fontSize:'0.78rem' }}>Odśwież</button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: '32px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div style={{ flex: '0 0 420px', maxWidth: '100%', background: '#1a2940', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '14px', padding: '24px' }}>
