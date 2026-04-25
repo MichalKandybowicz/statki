@@ -20,6 +20,7 @@ const DEFAULT_SOUND_SETTINGS = {
   miss: { enabled: true, volume: 0.85, src: '/sounds/miss.mp3' },
   sonarHit: { enabled: true, volume: 0.9, src: '/sounds/sonar-true.mp3', maxDuration: 1.5 },
   sonarMiss: { enabled: true, volume: 0.8, src: '/sounds/sonar-false.mp3', maxDuration: 1.5 },
+  holyBombStart: { enabled: true, volume: 0.9, src: '/sounds/worms-holy-hand-grenade.mp3' },
 }
 
 const DEFAULT_BATTLE_LAYOUT = {
@@ -123,6 +124,11 @@ export default function GamePage() {
          turnEnd: { ...DEFAULT_SOUND_SETTINGS.turnEnd, ...(parsed.turnEnd || {}) },
          hit: { ...DEFAULT_SOUND_SETTINGS.hit, ...(parsed.hit || {}) },
          miss: { ...DEFAULT_SOUND_SETTINGS.miss, ...(parsed.miss || {}) },
+          holyBombStart: {
+            ...DEFAULT_SOUND_SETTINGS.holyBombStart,
+            ...(parsed.holyBombStart || {}),
+            src: DEFAULT_SOUND_SETTINGS.holyBombStart.src,
+          },
          // Wymuszenie dedykowanych plikow sonaru zapobiega dziedziczeniu starego src hit/miss.
          sonarHit: {
            ...DEFAULT_SOUND_SETTINGS.sonarHit,
@@ -240,6 +246,10 @@ export default function GamePage() {
      playConfiguredSound(soundKey, 'sonar')
    }, [playConfiguredSound])
 
+   const playHolyBombStartSound = useCallback(() => {
+     playConfiguredSound('holyBombStart', 'sonar')
+   }, [playConfiguredSound])
+
   useEffect(() => {
     if (socket && gameId) socket.emit('reconnect_game', { gameId })
   }, [socket, gameId])
@@ -282,33 +292,56 @@ export default function GamePage() {
       const shots = Array.isArray(results) ? results.length : 0
       const hits = Array.isArray(results) ? results.filter(r => r.hit).length : 0
       const sunkAny = Array.isArray(results) ? results.some(r => r.sunk) : false
+      const abilityStartDelayMs = abilityType === 'holy_bomb' ? 1000 : 0
+
+      if (abilityType === 'holy_bomb') {
+        playHolyBombStartSound()
+      }
 
       if (shots <= 1) {
         const single = Array.isArray(results) ? results[0] : null
         const cellText = single ? ` (${toCellLabel(single.x, single.y)})` : ''
-        appendLogEntry(
-          `${actor}: umiejetnosc ${abilityType || 'specjalna'}${cellText} -> strzaly ${shots}, trafienia ${hits}${sunkAny ? ', zatopienie' : ''}`,
-          hits > 0 ? 'hit' : 'info'
-        )
+        const logSingle = () => {
+          appendLogEntry(
+            `${actor}: umiejetnosc ${abilityType || 'specjalna'}${cellText} -> strzaly ${shots}, trafienia ${hits}${sunkAny ? ', zatopienie' : ''}`,
+            hits > 0 ? 'hit' : 'info'
+          )
+        }
+        if (abilityStartDelayMs > 0) {
+          queueEffect(logSingle, abilityStartDelayMs)
+        } else {
+          logSingle()
+        }
       } else {
-        appendLogEntry(`${actor}: umiejetnosc ${abilityType || 'specjalna'} -> salwa ${shots} strzalow`, 'info')
+        const logBurst = () => appendLogEntry(`${actor}: umiejetnosc ${abilityType || 'specjalna'} -> salwa ${shots} strzalow`, 'info')
+        if (abilityStartDelayMs > 0) {
+          queueEffect(logBurst, abilityStartDelayMs)
+        } else {
+          logBurst()
+        }
         results.forEach((shot, idx) => {
           queueEffect(() => {
             const cell = toCellLabel(shot.x, shot.y)
             const shotOutcome = shot.sunk ? 'zatopienie' : shot.hit ? 'trafienie' : 'pudlo'
             appendLogEntry(`${actor}: pocisk ${idx + 1}/${shots} w ${cell} -> ${shotOutcome}`, shot.hit ? 'hit' : 'miss')
-          }, idx * ABILITY_REVEAL_STEP_MS)
+          }, abilityStartDelayMs + idx * ABILITY_REVEAL_STEP_MS)
         })
       }
 
       if (shots > 0) {
         if (shots === 1) {
-          playShotResultSound(hits > 0 || sunkAny ? 'hit' : 'miss')
+          if (abilityStartDelayMs > 0) {
+            queueEffect(() => {
+              playShotResultSound(hits > 0 || sunkAny ? 'hit' : 'miss')
+            }, abilityStartDelayMs)
+          } else {
+            playShotResultSound(hits > 0 || sunkAny ? 'hit' : 'miss')
+          }
         } else {
           results.forEach((shot, idx) => {
             queueEffect(() => {
               playShotResultSound(shot.hit || shot.sunk ? 'hit' : 'miss')
-            }, idx * ABILITY_REVEAL_STEP_MS)
+            }, abilityStartDelayMs + idx * ABILITY_REVEAL_STEP_MS)
           })
         }
       }
@@ -339,7 +372,7 @@ export default function GamePage() {
        socket.off('turn_update', onTurnUpdate)
        socket.off('game_over', onGameOver)
      }
-   }, [socket, myId, appendLogEntry, toCellLabel, playShotResultSound, playSonarSound, queueEffect, mergeUniquePositions])
+   }, [socket, myId, appendLogEntry, toCellLabel, playShotResultSound, playSonarSound, playHolyBombStartSound, queueEffect, mergeUniquePositions])
 
   useEffect(() => {
     if (!myId) return
@@ -767,6 +800,7 @@ export default function GamePage() {
                  { key: 'miss', label: 'Pudlo' },
                  { key: 'sonarHit', label: 'Sonar (coś wykrył)' },
                  { key: 'sonarMiss', label: 'Sonar (nic nie wykrył)' },
+                  { key: 'holyBombStart', label: 'Święta bomba (start)' },
                ].map(item => (
                 <div key={item.key} style={{ marginBottom:'10px', paddingBottom:'8px', borderBottom:'1px solid rgba(255,255,255,0.06)' }}>
                   <label style={{ display:'flex', alignItems:'center', justifyContent:'space-between', color:'#cbd5e1', fontSize:'0.78rem', marginBottom:'4px' }}>

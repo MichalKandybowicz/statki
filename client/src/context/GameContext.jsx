@@ -131,9 +131,10 @@ export function GameProvider({ children }) {
       })
     }
 
-    const handleAbilityResult = ({ results, playerId, boards: payloadBoards, fleet }) => {
+    const handleAbilityResult = ({ abilityType, results, playerId, boards: payloadBoards, fleet }) => {
       if (!user) return
       const shots = Array.isArray(results) ? results : []
+      const abilityStartDelayMs = abilityType === 'holy_bomb' ? 1000 : 0
       if (fleet) setMyFleet(fleet)
 
       if (shots.length === 0) {
@@ -161,14 +162,14 @@ export function GameProvider({ children }) {
       shots.forEach((shot, index) => {
         const timeoutId = setTimeout(() => {
           applyShotToBoard(shot)
-        }, index * ABILITY_REVEAL_STEP_MS)
+        }, abilityStartDelayMs + index * ABILITY_REVEAL_STEP_MS)
         pendingAbilityTimeoutsRef.current.push(timeoutId)
       })
 
       if (payloadBoards) {
         const syncTimeoutId = setTimeout(() => {
           setBoards(normaliseBoardData(payloadBoards))
-        }, shots.length * ABILITY_REVEAL_STEP_MS + 10)
+        }, abilityStartDelayMs + shots.length * ABILITY_REVEAL_STEP_MS + 10)
         pendingAbilityTimeoutsRef.current.push(syncTimeoutId)
       }
     }
