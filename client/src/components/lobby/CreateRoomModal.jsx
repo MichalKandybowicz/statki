@@ -37,12 +37,14 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
       communityCount: communityList.length,
     })
 
+    setOwnBoards(ownList)
+
     if (requestId !== latestCommunityRequestIdRef.current) {
-      console.warn('[CreateRoomModal] ignoring stale board catalog response', { requestId })
+      console.warn('[CreateRoomModal] ignoring stale community part of board catalog response', { requestId, ownCount: ownList.length })
+      setBoardsLoading(false)
       return
     }
 
-    setOwnBoards(ownList)
     setCommunityBoards(communityList)
     baseCommunityBoardsRef.current = communityList
 
@@ -129,6 +131,15 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
     }
     return Array.from(map.values())
   }, [ownBoards, communityBoards, user?._id, user?.username, user?.email])
+
+  useEffect(() => {
+    console.log('[CreateRoomModal] merged boards', {
+      ownCount: ownBoards.length,
+      communityCount: communityBoards.length,
+      mergedCount: allBoards.length,
+      selectedBoardId: boardTemplateId || null,
+    })
+  }, [ownBoards.length, communityBoards.length, allBoards.length, boardTemplateId])
 
   useEffect(() => {
     if (allBoards.length === 0) return
