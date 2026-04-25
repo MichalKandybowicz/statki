@@ -1,14 +1,21 @@
+import { trimShapeToBoundingBox } from '../../utils/boardUtils.js'
+
 const GRID = 4
 
 export default function ShipGrid({ shape, onToggle, readOnly, cellSize }) {
   const size = cellSize || (readOnly ? 14 : 40)
+  const gridShape = readOnly ? trimShapeToBoundingBox(shape) : shape
+  const rows = readOnly ? (gridShape?.length || 1) : GRID
+  const cols = readOnly
+    ? Math.max(1, ...(gridShape || []).map(row => (Array.isArray(row) ? row.length : 0)))
+    : GRID
 
   return (
     <div style={{ display: 'inline-block', lineHeight: 0 }}>
-      {Array.from({ length: GRID }).map((_, r) => (
+      {Array.from({ length: rows }).map((_, r) => (
         <div key={r} style={{ display: 'flex' }}>
-          {Array.from({ length: GRID }).map((_, c) => {
-            const isShip = shape?.[r]?.[c] === 1
+          {Array.from({ length: cols }).map((_, c) => {
+            const isShip = gridShape?.[r]?.[c] === 1
             return (
               <div
                 key={c}

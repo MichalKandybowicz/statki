@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { rotateShape, getShipCells, canPlaceShip } from '../../utils/boardUtils.js'
+import { rotateShape, getShipCells, canPlaceShip, trimShapeToBoundingBox } from '../../utils/boardUtils.js'
 import ShipSelector from './ShipSelector.jsx'
 
 const TILE_SIZE = 30
 
 function applyRotations(shape, times) {
-  let s = shape
+  let s = trimShapeToBoundingBox(shape)
   for (let i = 0; i < times; i++) s = rotateShape(s)
   return s
 }

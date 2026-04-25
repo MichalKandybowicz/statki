@@ -15,6 +15,41 @@ export function rotateShape(shape) {
   return rotated
 }
 
+export function trimShapeToBoundingBox(shape) {
+  if (!Array.isArray(shape) || shape.length === 0) return [[0]]
+
+  let minR = Infinity
+  let maxR = -1
+  let minC = Infinity
+  let maxC = -1
+
+  for (let r = 0; r < shape.length; r++) {
+    const row = Array.isArray(shape[r]) ? shape[r] : []
+    for (let c = 0; c < row.length; c++) {
+      if (row[c] === 1) {
+        if (r < minR) minR = r
+        if (r > maxR) maxR = r
+        if (c < minC) minC = c
+        if (c > maxC) maxC = c
+      }
+    }
+  }
+
+  if (maxR < minR || maxC < minC) return [[0]]
+
+  const trimmed = []
+  for (let r = minR; r <= maxR; r++) {
+    const srcRow = Array.isArray(shape[r]) ? shape[r] : []
+    const nextRow = []
+    for (let c = minC; c <= maxC; c++) {
+      nextRow.push(srcRow[c] === 1 ? 1 : 0)
+    }
+    trimmed.push(nextRow)
+  }
+
+  return trimmed
+}
+
 export function getShipCells(shape) {
   const cells = []
   for (let r = 0; r < shape.length; r++) {
