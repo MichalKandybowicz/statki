@@ -521,6 +521,17 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
       }
 
       const winnerId = checkWinCondition(game);
+      const detectedPositions = Array.isArray(results)
+        ? Array.from(
+            new Map(
+              results
+                .flatMap((shot) => Array.isArray(shot?.detectedPositions) ? shot.detectedPositions : [])
+                .filter((pos) => Number.isInteger(pos?.x) && Number.isInteger(pos?.y))
+                .map((pos) => [`${pos.x}:${pos.y}`, { x: pos.x, y: pos.y }])
+            ).values()
+          )
+        : [];
+
       if (winnerId) {
         markGameAsFinished(game, {
           winnerId,
@@ -537,6 +548,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
             abilityType: ship.abilityType,
             results,
+            detectedPositions,
             shipIndex,
             playerId: userId,
             boards: getPlayerView(game, pidStr),
@@ -565,6 +577,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         emitToUser(io, connectedUsers, pid.toString(), 'ability_result', {
           abilityType: ship.abilityType,
           results,
+          detectedPositions,
           shipIndex,
           playerId: userId,
           boards: getPlayerView(game, pidStr),

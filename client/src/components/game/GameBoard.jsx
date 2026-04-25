@@ -5,7 +5,7 @@ function getTileColor(tile, isOwnBoard) {
     case 'hit': return '#f59e0b'
     case 'miss': return '#0a1f33'
     case 'sunk': return '#ef4444'
-    case 'detected': return '#1d4ed8'
+    case 'detected': return '#1a3a5c'
     default: return '#1a3a5c'
   }
 }
@@ -51,7 +51,7 @@ export default function GameBoard({
               const isTargeted = targetPositions?.some(p => p.x === c && p.y === r)
               const isPreview = previewPositions?.some(p => p.x === c && p.y === r)
               const displayTile = (!isOwnBoard && tile === 'ship') ? 'water' : tile
-              const sonarVisible = isSonar && displayTile !== 'hit' && displayTile !== 'miss' && displayTile !== 'sunk'
+              const sonarVisible = (isSonar || displayTile === 'detected') && displayTile !== 'hit' && displayTile !== 'miss' && displayTile !== 'sunk'
               const bg = isTargeted
                   ? '#7c2d12'
                   : isPreview
@@ -89,7 +89,6 @@ export default function GameBoard({
                 >
                   {displayTile === 'miss' && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.5)' }} />}
                   {(displayTile === 'hit' || displayTile === 'sunk') && '💥'}
-                  {displayTile === 'detected' && '📡'}
                 </div>
               )
             })}

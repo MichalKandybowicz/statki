@@ -270,7 +270,7 @@ export default function GamePage() {
       playShotResultSound(hit || sunk ? 'hit' : 'miss')
     }
 
-    const onAbilityResult = ({ playerId, abilityType, results, origin, foundCount, positions }) => {
+    const onAbilityResult = ({ playerId, abilityType, results, origin, foundCount, positions, detectedPositions }) => {
       const actor = playerId === myId ? 'Ty' : 'Przeciwnik'
 
       if (abilityType === 'sonar') {
@@ -292,7 +292,16 @@ export default function GamePage() {
       const shots = Array.isArray(results) ? results.length : 0
       const hits = Array.isArray(results) ? results.filter(r => r.hit).length : 0
       const sunkAny = Array.isArray(results) ? results.some(r => r.sunk) : false
+      const detected = Array.isArray(detectedPositions) ? detectedPositions : []
       const abilityStartDelayMs = abilityType === 'holy_bomb' ? 1000 : 0
+
+      if (detected.length > 0) {
+        if (playerId === myId) {
+          setEnemySonarPositions(prev => mergeUniquePositions(prev, detected))
+        } else {
+          setOwnSonarPositions(prev => mergeUniquePositions(prev, detected))
+        }
+      }
 
       if (abilityType === 'holy_bomb') {
         playHolyBombStartSound()
