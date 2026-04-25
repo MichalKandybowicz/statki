@@ -23,6 +23,9 @@ function validateShipForAbility(game, playerId, shipIndex) {
   if (size < rules.minSize) {
     throw new Error(`Ship too small for ${ship.abilityType} ability`);
   }
+  if (rules.maxSize && size > rules.maxSize) {
+    throw new Error(`Ship too large for ${ship.abilityType} ability`);
+  }
 
   return { fleet, ship, size, rules };
 }
@@ -42,6 +45,34 @@ function getOpponentId(game, playerId) {
 
 function isShotTile(tile) {
   return tile === 'miss' || tile === 'hit' || tile === 'sunk';
+}
+
+function canMarkDetected(tile) {
+  return tile !== 'hit' && tile !== 'miss' && tile !== 'sunk';
+}
+
+function markDetectedPositions(game, playerId, opponentId, positions) {
+  const opponentBoard = game.boards.get(opponentId);
+  if (!opponentBoard) return [];
+  const visible = opponentBoard.visible;
+  const marked = [];
+
+  for (const pos of positions || []) {
+    const x = Number(pos?.x);
+    const y = Number(pos?.y);
+    if (!Number.isInteger(x) || !Number.isInteger(y)) continue;
+    if (x < 0 || x >= game.boardSize || y < 0 || y >= game.boardSize) continue;
+    if (!canMarkDetected(visible[y][x])) continue;
+
+    visible[y][x] = 'detected';
+    marked.push({ x, y });
+  }
+
+  if (marked.length > 0) {
+    game.boards.set(opponentId, opponentBoard);
+    game.markModified('boards');
+  }
+  return marked;
 }
 
 function isVisionBlockingTile(tile) {
@@ -290,6 +321,7 @@ function useSonar(game, playerId, shipIndex, target) {
   }
 
   const positions = revealed.map(({ x, y }) => ({ x, y }));
+  const detectedPositions = markDetectedPositions(game, playerId, opponentId, positions);
   const detectedType = revealed[0]?.type || 'water';
 
   applyCooldown(fleet, shipIndex, getAbilityCooldown('sonar', ship.positions.length));
@@ -300,10 +332,122 @@ function useSonar(game, playerId, shipIndex, target) {
     type: detectedType,
     nearest: revealed[0] ? { x: revealed[0].x, y: revealed[0].y } : null,
     positions,
+    detectedPositions,
     scanCount: rules.scanCount,
     blocked: blockedShipExists && revealed.length === 0,
     origin: target,
   };
+}
+
+/**
+ * Scout rocket: single shot. If it hits, all cells of that ship become detected.
+ */
+function useScoutRocket(game, playerId, shipIndex, target) {
+  const { fleet } = validateShipForAbility(game, playerId, shipIndex);
+  if (!target || target.x === undefined || target.y === undefined) {
+    throw new Error('Target point is required for scout rocket');
+  }
+  if (target.x < 0 || target.x >= game.boardSize || target.y < 0 || target.y >= game.boardSize) {
+    throw new Error('Scout rocket target out of bounds');
+  }
+
+  const result = processMove(game, playerId, target.x, target.y);
+  const opponentId = getOpponentId(game, playerId);
+  let detectedPositions = [];
+
+  if (result.hit && Number.isInteger(result.shipIndex) && result.shipIndex >= 0) {
+    const opponentFleet = game.fleets.get(opponentId) || [];
+    const hitShip = opponentFleet[result.shipIndex];
+    if (hitShip?.positions?.length) {
+      detectedPositions = markDetectedPositions(game, playerId, opponentId, hitShip.positions);
+    }
+  }
+
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('scout_rocket', fleet[shipIndex].positions?.length || 1));
+  game.fleets.set(playerId.toString(), fleet);
+  game.markModified('fleets');
+
+  return [{
+    x: target.x,
+    y: target.y,
+    hit: result.hit,
+    sunk: result.sunk,
+    shipIndex: result.shipIndex,
+    sunkPositions: result.sunkPositions || [],
+    alreadyShot: result.alreadyShot,
+    detectedPositions,
+  }];
+}
+
+/**
+ * Holy bomb: can only be used on detected enemy tile and sinks that entire ship.
+ */
+function useHolyBomb(game, playerId, shipIndex, target) {
+  const { fleet } = validateShipForAbility(game, playerId, shipIndex);
+  if (!target || target.x === undefined || target.y === undefined) {
+    throw new Error('Target point is required for holy bomb');
+  }
+  if (target.x < 0 || target.x >= game.boardSize || target.y < 0 || target.y >= game.boardSize) {
+    throw new Error('Holy bomb target out of bounds');
+  }
+
+  const opponentId = getOpponentId(game, playerId);
+  const opponentBoard = game.boards.get(opponentId);
+  if (!opponentBoard) throw new Error('Opponent board not found');
+
+  if (opponentBoard.visible[target.y]?.[target.x] !== 'detected') {
+    throw new Error('Holy bomb requires a detected enemy tile');
+  }
+
+  const opponentFleet = game.fleets.get(opponentId) || [];
+  const hitShipIndex = opponentFleet.findIndex((ship) =>
+    ship.positions?.some((p) => p.x === target.x && p.y === target.y)
+  );
+  if (hitShipIndex < 0) {
+    throw new Error('No ship found on selected detected tile');
+  }
+
+  const targetShip = opponentFleet[hitShipIndex];
+  if (!targetShip || targetShip.isSunk) {
+    throw new Error('Selected ship is already sunk');
+  }
+
+  const hidden = opponentBoard.hidden;
+  const visible = opponentBoard.visible;
+  const existingHits = new Set((targetShip.hits || []).map((p) => `${p.x}:${p.y}`));
+  const results = [];
+
+  for (const pos of targetShip.positions || []) {
+    hidden[pos.y][pos.x] = 'sunk';
+    visible[pos.y][pos.x] = 'sunk';
+    const key = `${pos.x}:${pos.y}`;
+    if (!existingHits.has(key)) {
+      targetShip.hits.push({ x: pos.x, y: pos.y });
+      existingHits.add(key);
+    }
+    results.push({
+      x: pos.x,
+      y: pos.y,
+      hit: true,
+      sunk: true,
+      shipIndex: hitShipIndex,
+      sunkPositions: targetShip.positions.map((p) => ({ x: p.x, y: p.y })),
+      alreadyShot: false,
+    });
+  }
+
+  targetShip.isSunk = true;
+  game.fleets.set(opponentId, opponentFleet);
+  game.boards.set(opponentId, opponentBoard);
+  game.lastActionAt = new Date();
+  game.markModified('fleets');
+  game.markModified('boards');
+
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('holy_bomb', fleet[shipIndex].positions?.length || 1));
+  game.fleets.set(playerId.toString(), fleet);
+  game.markModified('fleets');
+
+  return results;
 }
 
 /**
@@ -321,4 +465,12 @@ function tickCooldowns(game, playerId) {
   game.markModified('fleets');
 }
 
-module.exports = { useLinearShot, useRandomShot, useTargetShot, useSonar, tickCooldowns };
+module.exports = {
+  useLinearShot,
+  useRandomShot,
+  useTargetShot,
+  useSonar,
+  useScoutRocket,
+  useHolyBomb,
+  tickCooldowns,
+};

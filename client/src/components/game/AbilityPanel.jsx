@@ -68,6 +68,10 @@ export default function AbilityPanel({
                 ? 'Wybierz linię'
                 : ship.abilityType === 'sonar'
                   ? 'Wybierz punkt skanu'
+                  : ship.abilityType === 'scout_rocket'
+                    ? 'Wybierz cel rakiety'
+                    : ship.abilityType === 'holy_bomb'
+                      ? 'Wybierz wykryte pole'
                   : 'Użyj umiejętności'}
           </button>
         </div>
@@ -80,6 +84,10 @@ export default function AbilityPanel({
                   ? `kliknij początek salwy (${linearDirection === 'horizontal' ? 'poziomo' : 'pionowo'}, długość ${ship.positions?.length || 1})`
                   : targetingMode.type === 'sonar'
                     ? 'kliknij pole, z którego ma pójść impuls sonaru'
+                    : targetingMode.type === 'scout_rocket'
+                      ? 'kliknij pojedyncze pole celu rakiety zwiadowczej'
+                      : targetingMode.type === 'holy_bomb'
+                        ? 'kliknij pole oznaczone jako wykryte'
                     : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
               </div>
 

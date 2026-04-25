@@ -39,7 +39,7 @@ function validateName(name) {
 }
 
 function validateAbilityForSize(abilityType, size) {
-  const validAbilities = ['linear', 'random', 'target', 'sonar'];
+  const validAbilities = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb'];
   if (!validAbilities.includes(abilityType)) {
     return 'Invalid abilityType';
   }
@@ -47,6 +47,9 @@ function validateAbilityForSize(abilityType, size) {
   const rules = getAbilityRules(abilityType, size);
   if (size < rules.minSize) {
     return `Ability ${abilityType} requires ship size >= ${rules.minSize}`;
+  }
+  if (rules.maxSize && size > rules.maxSize) {
+    return `Ability ${abilityType} requires ship size <= ${rules.maxSize}`;
   }
 
   return null;
@@ -71,7 +74,7 @@ router.get('/', async (req, res) => {
 router.get('/community', async (req, res) => {
   try {
     const { abilityType, name, size } = req.query;
-    const validAbilities = ['linear', 'random', 'target', 'sonar'];
+    const validAbilities = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb'];
 
     const query = {
       ownerId: { $ne: req.user._id },

@@ -4,7 +4,15 @@ const User = require('../models/User');
 const BoardTemplate = require('../models/BoardTemplate');
 const ShipTemplate = require('../models/ShipTemplate');
 const { initGame, processMove, checkWinCondition, getPlayerView } = require('../engine/gameEngine');
-const { useLinearShot, useRandomShot, useTargetShot, useSonar, tickCooldowns } = require('../engine/abilityEngine');
+const {
+  useLinearShot,
+  useRandomShot,
+  useTargetShot,
+  useSonar,
+  useScoutRocket,
+  useHolyBomb,
+  tickCooldowns,
+} = require('../engine/abilityEngine');
 const { endTurn, checkSkips } = require('../engine/turnEngine');
 const { validatePlacement } = require('../utils/shipPlacement');
 const { emitToUser } = require('./socketUtils');
@@ -468,6 +476,12 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           break;
         case 'target':
           results = useTargetShot(game, userId, shipIndex, targets);
+          break;
+        case 'scout_rocket':
+          results = useScoutRocket(game, userId, shipIndex, targets?.[0]);
+          break;
+        case 'holy_bomb':
+          results = useHolyBomb(game, userId, shipIndex, targets?.[0]);
           break;
         case 'sonar': {
           const sonarResult = useSonar(game, userId, shipIndex, targets?.[0]);

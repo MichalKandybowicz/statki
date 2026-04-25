@@ -33,7 +33,7 @@ const shipTemplateSchema = new mongoose.Schema({
   },
   abilityType: {
     type: String,
-    enum: ['linear', 'random', 'target', 'sonar'],
+    enum: ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb'],
     required: true,
   },
 });

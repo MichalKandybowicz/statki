@@ -5,6 +5,7 @@ function getTileColor(tile, isOwnBoard) {
     case 'hit': return '#f59e0b'
     case 'miss': return '#0a1f33'
     case 'sunk': return '#ef4444'
+    case 'detected': return '#1d4ed8'
     default: return '#1a3a5c'
   }
 }
@@ -21,6 +22,7 @@ export default function GameBoard({
   previewPositions,
   previewInvalid,
   isTargeting,
+  targetingModeType,
   maxBoardPx,
 }) {
   if (!tiles || !boardSize) return <div style={{ color: '#64748b', padding: '20px' }}>Loading board…</div>
@@ -57,7 +59,10 @@ export default function GameBoard({
                     : getTileColor(displayTile, isOwnBoard)
 
               const isInteractive = !isOwnBoard && !!onTileClick
-              const canClick = isInteractive && (isTargeting ? true : (displayTile === 'water' || displayTile === 'rock'))
+              const canClickInTargetMode = targetingModeType === 'holy_bomb'
+                ? displayTile === 'detected'
+                : true
+              const canClick = isInteractive && (isTargeting ? canClickInTargetMode : (displayTile === 'water' || displayTile === 'rock' || displayTile === 'detected'))
               return (
                 <div
                   key={c}
@@ -84,6 +89,7 @@ export default function GameBoard({
                 >
                   {displayTile === 'miss' && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.5)' }} />}
                   {(displayTile === 'hit' || displayTile === 'sunk') && '💥'}
+                  {displayTile === 'detected' && '📡'}
                 </div>
               )
             })}

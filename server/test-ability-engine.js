@@ -1,5 +1,14 @@
-const { useLinearShot, useRandomShot, useTargetShot, useSonar, tickCooldowns } = require('./src/engine/abilityEngine');
+const {
+  useLinearShot,
+  useRandomShot,
+  useTargetShot,
+  useSonar,
+  useScoutRocket,
+  useHolyBomb,
+  tickCooldowns,
+} = require('./src/engine/abilityEngine');
 const { processMove } = require('./src/engine/gameEngine');
+const { getAbilityCooldown } = require('./src/engine/abilityConfig');
 
 function makeBoard(size, fill = 'water') {
   return Array.from({ length: size }, () => Array(size).fill(fill));
@@ -71,7 +80,7 @@ function assert(condition, message) {
   const results = useLinearShot(game, 'A', 0, { x: 2, y: 2 }, 'horizontal');
   assert(results.length === 2, 'linear should shoot exactly ship-size segment');
   assert(results[0].hit === true && results[1].hit === true, 'linear should hit both cells in chosen segment');
-  assert(game.fleets.get('A')[0].cooldownRemaining === 2, 'linear cooldown should equal ship size');
+  assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('linear', 2), 'linear cooldown should follow config');
 })();
 
 (function testRandomShot() {
@@ -82,7 +91,7 @@ function assert(condition, message) {
   shooter.cooldownRemaining = 0;
   const results = useRandomShot(game, 'A', 1);
   assert(results.length === 3, 'random should fire size - 1 shots');
-  assert(game.fleets.get('A')[1].cooldownRemaining === 5, 'random cooldown should be size + 1');
+  assert(game.fleets.get('A')[1].cooldownRemaining === getAbilityCooldown('random', 4), 'random cooldown should follow config');
 })();
 
 (function testTargetShotStopsOnHit() {
@@ -94,7 +103,7 @@ function assert(condition, message) {
   const results = useTargetShot(game, 'A', 0, [{ x: 0, y: 0 }, { x: 2, y: 2 }, { x: 5, y: 5 }]);
   assert(results.length === 2, 'target should stop after first hit');
   assert(results[0].hit === false && results[1].hit === true, 'target should miss then hit');
-  assert(game.fleets.get('A')[0].cooldownRemaining === 4, 'target cooldown should be size + 1');
+  assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('target', 3), 'target cooldown should follow config');
 })();
 
 (function testSonarAndCooldownTick() {
@@ -105,9 +114,9 @@ function assert(condition, message) {
   assert(Array.isArray(sonar.positions) && sonar.positions.length === 1, 'size 3 sonar should reveal one position');
   assert(sonar.type === 'ship' && sonar.nearest, 'sonar should detect nearest ship');
   assert(sonar.origin.x === 4 && sonar.origin.y === 2, 'sonar should remember scan origin');
-  assert(game.fleets.get('A')[1].cooldownRemaining === 3, 'sonar size 3 should set cooldown to 3');
+  assert(game.fleets.get('A')[1].cooldownRemaining === getAbilityCooldown('sonar', 3), 'sonar cooldown should follow config');
   tickCooldowns(game, 'A');
-  assert(game.fleets.get('A')[1].cooldownRemaining === 2, 'tickCooldowns should decrement cooldown');
+  assert(game.fleets.get('A')[1].cooldownRemaining === getAbilityCooldown('sonar', 3) - 1, 'tickCooldowns should decrement cooldown');
 })();
 
 (function testSonarBlockedByRock() {
@@ -150,7 +159,7 @@ function assert(condition, message) {
   assert(sonar.scanCount === 2, 'size 6 sonar should have 2 impulses');
   assert(sonar.positions.length === 2, 'size 6 sonar should reveal 2 nearest ship tiles');
   assert(sonar.positions.every((pos) => pos.y === 4), 'revealed sonar tiles should belong to the nearby target ship');
-  assert(game.fleets.get('A')[1].cooldownRemaining === 6, 'size 6 sonar should set cooldown to 6');
+  assert(game.fleets.get('A')[1].cooldownRemaining === getAbilityCooldown('sonar', 6), 'size 6 sonar cooldown should follow config');
 })();
 
 (function testSonarDoesNotDetectShipBehindRock() {
@@ -179,6 +188,54 @@ function assert(condition, message) {
   const sonar = useSonar(game, 'A', 1, { x: 0, y: 8 });
   assert(sonar.positions.length === 0, 'sonar should not reveal ship hidden behind rock');
   assert(sonar.blocked === true, 'sonar should report blocked when rock obstructs line of sight');
+})();
+
+(function testScoutRocketMarksDetectedShipCells() {
+  const game = makeGame(9);
+  const fleetA = game.fleets.get('A');
+  fleetA[0] = {
+    name: 'Scout',
+    abilityType: 'scout_rocket',
+    positions: [{ x: 0, y: 8 }, { x: 1, y: 8 }, { x: 2, y: 8 }, { x: 3, y: 8 }],
+    hits: [],
+    isSunk: false,
+    cooldownRemaining: 0,
+  };
+  game.fleets.set('A', fleetA);
+
+  const results = useScoutRocket(game, 'A', 0, { x: 2, y: 2 });
+  assert(results.length === 1 && results[0].hit === true, 'scout rocket should fire single shot and hit target');
+  const visible = game.boards.get('B').visible;
+  assert(visible[2][3] === 'detected', 'scout rocket should mark sibling ship cells as detected');
+  assert(game.fleets.get('A')[0].cooldownRemaining === 5, 'scout rocket cooldown should be 5');
+})();
+
+(function testHolyBombRequiresDetectedAndSinksWholeShip() {
+  const game = makeGame(9);
+  const fleetA = game.fleets.get('A');
+  fleetA[0] = {
+    name: 'Holy',
+    abilityType: 'holy_bomb',
+    positions: [{ x: 0, y: 8 }, { x: 1, y: 8 }, { x: 2, y: 8 }, { x: 3, y: 8 }, { x: 4, y: 8 }, { x: 5, y: 8 }, { x: 6, y: 8 }],
+    hits: [],
+    isSunk: false,
+    cooldownRemaining: 0,
+  };
+  game.fleets.set('A', fleetA);
+
+  let failed = false;
+  try {
+    useHolyBomb(game, 'A', 0, { x: 2, y: 2 });
+  } catch {
+    failed = true;
+  }
+  assert(failed, 'holy bomb should fail when tile is not detected');
+
+  useSonar(game, 'A', 1, { x: 2, y: 1 });
+  const results = useHolyBomb(game, 'A', 0, { x: 2, y: 2 });
+  assert(results.length >= 2, 'holy bomb should return all ship cells as sunk results');
+  assert(game.fleets.get('B')[0].isSunk === true, 'holy bomb should sink entire target ship');
+  assert(game.fleets.get('A')[0].cooldownRemaining === 11, 'holy bomb cooldown should be 11');
 })();
 
 console.log('ability tests ok')

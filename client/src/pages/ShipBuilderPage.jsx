@@ -272,6 +272,8 @@ export default function ShipBuilderPage() {
               <option value="random">Losowy ostrzał</option>
               <option value="target">Atak obszarowy</option>
               <option value="sonar">Sonar</option>
+              <option value="scout_rocket">Rakieta zwiadowcza</option>
+              <option value="holy_bomb">Święta bomba</option>
             </select>
             <select
               value={communityFilters.size}

@@ -28,6 +28,18 @@ function getAbilityRules(type, size = 1) {
         scanCount,
       };
     }
+    case 'scout_rocket':
+      return {
+        minSize: 4,
+        maxSize: 6,
+        cooldown: normalizedSize + 3,
+      };
+    case 'holy_bomb':
+      return {
+        minSize: 7,
+        maxSize: 7,
+        cooldown: 11,
+      };
     default:
       return {
         minSize: 1,

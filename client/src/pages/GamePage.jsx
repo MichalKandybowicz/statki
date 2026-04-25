@@ -104,7 +104,7 @@ export default function GamePage() {
     if (!Array.isArray(positions) || !board) return positions || []
     return positions.filter(({ x, y }) => {
       const tile = board?.[y]?.[x]
-      return tile !== 'hit' && tile !== 'miss' && tile !== 'sunk'
+      return tile !== 'hit' && tile !== 'miss' && tile !== 'sunk' && tile !== 'detected'
     })
   }, [])
 
@@ -511,6 +511,7 @@ export default function GamePage() {
           previewPositions={targetingMode?.type === 'linear' ? linearPreview.positions : []}
           previewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
           isTargeting={!!targetingMode}
+          targetingModeType={targetingMode?.type || null}
           maxBoardPx={enemyBoardMaxPx}
         />
       )}
@@ -554,6 +555,17 @@ export default function GamePage() {
         return
       }
 
+      if (targetingMode.type === 'scout_rocket' || targetingMode.type === 'holy_bomb') {
+        socket?.emit('use_ability', {
+          gameId,
+          shipIndex: targetingMode.shipIndex,
+          targets: [{ x, y }],
+        })
+        setTargetingMode(null)
+        setLinearHoverStart(null)
+        return
+      }
+
       const alreadyChosen = targetingMode.targets.some(target => target.x === x && target.y === y)
       if (alreadyChosen) return
       if (targetingMode.targets.length >= targetingMode.maxTargets) return
@@ -579,6 +591,18 @@ export default function GamePage() {
 
     if (ship.abilityType === 'sonar') {
       setTargetingMode({ type: 'sonar', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
+      return
+    }
+
+    if (ship.abilityType === 'scout_rocket') {
+      setTargetingMode({ type: 'scout_rocket', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
+      return
+    }
+
+    if (ship.abilityType === 'holy_bomb') {
+      setTargetingMode({ type: 'holy_bomb', shipIndex, maxTargets: 1, targets: [] })
       setLinearHoverStart(null)
       return
     }

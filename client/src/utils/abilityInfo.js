@@ -54,6 +54,26 @@ export function getAbilityInfo(type, size = 1) {
         requirement: '1-3 pola = 1 skan, 4-6 = 2 skany, 7 = 3 skany.',
       }
     }
+    case 'scout_rocket':
+      return {
+        key: 'scout_rocket',
+        label: 'Rakieta zwiadowcza',
+        shortLabel: 'Zwiad',
+        cooldown: 5,
+        description: 'Oddajesz pojedynczy strzał. Jeśli trafi, wszystkie pola trafionego statku zostają oznaczone jako wykryte.',
+        targeting: 'Wymaga wskazania jednego pola na planszy przeciwnika.',
+        requirement: 'Rozmiar statku: 4-6 pól.',
+      }
+    case 'holy_bomb':
+      return {
+        key: 'holy_bomb',
+        label: 'Święta bomba',
+        shortLabel: 'Bomba',
+        cooldown: 11,
+        description: 'Może zostać użyta tylko na wykrytym polu wrogiego statku. Niszczy cały wskazany statek naraz.',
+        targeting: 'Wybierz pole oznaczone jako wykryte.',
+        requirement: 'Rozmiar statku: dokładnie 7 pól.',
+      }
     default:
       return {
         key: type || 'unknown',
@@ -67,7 +87,7 @@ export function getAbilityInfo(type, size = 1) {
   }
 }
 
-export const ABILITY_TYPES = ['linear', 'random', 'target', 'sonar']
+export const ABILITY_TYPES = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb']
 
 export function getAbilityCards(size = 1) {
   return ABILITY_TYPES.map(type => getAbilityInfo(type, size))
