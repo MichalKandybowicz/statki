@@ -17,6 +17,7 @@ export function GameProvider({ children }) {
   const [turn, setTurn] = useState(null)
   const [turnStartedAt, setTurnStartedAt] = useState(null)
   const [status, setStatus] = useState(null)
+  const [isRanked, setIsRanked] = useState(false)
   const [winnerId, setWinnerId] = useState(null)
   const [players, setPlayers] = useState([])
   const [skips, setSkips] = useState({})
@@ -43,6 +44,7 @@ export function GameProvider({ children }) {
     if (data.turn !== undefined) setTurn(data.turn)
     if (data.turnStartedAt) setTurnStartedAt(data.turnStartedAt)
     if (data.status) setStatus(data.status)
+    if (data.isRanked !== undefined) setIsRanked(!!data.isRanked)
     if (data.winnerId !== undefined) setWinnerId(data.winnerId)
     if (data.players) setPlayers(data.players)
     if (data.skips) setSkips(data.skips)
@@ -58,6 +60,7 @@ export function GameProvider({ children }) {
     setTurn(null)
     setTurnStartedAt(null)
     setStatus(null)
+    setIsRanked(false)
     setWinnerId(null)
     setPlayers([])
     setSkips({})
@@ -85,6 +88,7 @@ export function GameProvider({ children }) {
       setTurnStartedAt(data.turnStartedAt)
       setPlayers(data.players || [])
       setStatus(data.status || 'in_game')
+      setIsRanked(!!data.isRanked)
       if (data.skips) setSkips(data.skips)
     }
 
@@ -98,6 +102,7 @@ export function GameProvider({ children }) {
       if (data.turn !== undefined) setTurn(data.turn)
       if (data.turnStartedAt) setTurnStartedAt(data.turnStartedAt)
       if (data.status) setStatus(data.status)
+      if (data.isRanked !== undefined) setIsRanked(!!data.isRanked)
       if (data.winnerId !== undefined) setWinnerId(data.winnerId)
       if (data.players) setPlayers(data.players)
       if (data.skips) setSkips(data.skips)
@@ -202,7 +207,7 @@ export function GameProvider({ children }) {
   return (
     <GameContext.Provider value={{
       gameId, boardSize, boards, myFleet, turn, turnStartedAt,
-      turnTimeLimit, status, winnerId, players, skips, setGameData, clearGame,
+      turnTimeLimit, status, isRanked, winnerId, players, skips, setGameData, clearGame,
     }}>
       {children}
     </GameContext.Provider>

@@ -41,6 +41,10 @@ router.get('/history', authMiddleware, async (req, res) => {
         gameId: game._id.toString(),
         endedAt: game.endedAt || game.updatedAt || game.createdAt,
         endReason: game.endReason || 'win',
+        isRanked: !!game.isRanked,
+        eloDelta: typeof game.eloDeltas?.get === 'function'
+          ? (game.eloDeltas.get(myId.toString()) || 0)
+          : (game.eloDeltas?.[myId.toString()] || 0),
         winnerId,
         winnerName: displayName(winner),
         opponentId: opponent?._id ? opponent._id.toString() : null,
@@ -63,6 +67,30 @@ router.get('/history', authMiddleware, async (req, res) => {
   } catch (err) {
     console.error('History stats error:', err);
     res.status(500).json({ error: 'Failed to load history' });
+  }
+});
+
+// GET /api/stats/leaderboard?limit=20
+router.get('/leaderboard', authMiddleware, async (req, res) => {
+  try {
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const players = await User.find({})
+      .select('username email elo createdAt')
+      .sort({ elo: -1, createdAt: 1, _id: 1 })
+      .limit(limit)
+      .lean();
+
+    res.json({
+      items: players.map((u, index) => ({
+        rank: index + 1,
+        userId: u._id.toString(),
+        username: displayName(u),
+        elo: Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800,
+      })),
+    });
+  } catch (err) {
+    console.error('Leaderboard error:', err);
+    res.status(500).json({ error: 'Failed to load leaderboard' });
   }
 });
 
@@ -152,4 +180,5 @@ router.get('/head-to-head/:opponentId', authMiddleware, async (req, res) => {
 });
 
 module.exports = router;
+
 

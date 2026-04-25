@@ -13,6 +13,7 @@ export default function ProfilePage() {
   const [selectedOpponent, setSelectedOpponent] = useState(null)
   const [headToHead, setHeadToHead] = useState(null)
   const [h2hLoading, setH2hLoading] = useState(false)
+  const [leaderboard, setLeaderboard] = useState([])
 
   useEffect(() => {
     let mounted = true
@@ -33,6 +34,23 @@ export default function ProfilePage() {
     }
 
     loadHistory()
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadLeaderboard() {
+      try {
+        const res = await statsApi.leaderboard({ limit: 10 })
+        if (!mounted) return
+        setLeaderboard(res.data.items || [])
+      } catch {
+        if (mounted) setLeaderboard([])
+      }
+    }
+
+    loadLeaderboard()
     return () => { mounted = false }
   }, [])
 
@@ -95,6 +113,9 @@ export default function ProfilePage() {
       <h1 style={{ color: '#e2e8f0', fontSize: '1.7rem', marginBottom: '6px' }}>Profil gracza</h1>
       <p style={{ color: '#94a3b8', marginBottom: '18px' }}>
         {displayName} | Bilans: <b style={{ color: '#22c55e' }}>{totalWins}W</b> - <b style={{ color: '#f87171' }}>{totalLosses}L</b>
+      </p>
+      <p style={{ color: '#fbbf24', marginTop: '-10px', marginBottom: '18px', fontWeight: 700 }}>
+        ELO: {user?.elo ?? 800}
       </p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(300px, 1fr)', gap: '16px', alignItems: 'start' }}>
@@ -164,6 +185,22 @@ export default function ProfilePage() {
               <p style={mutedStyle}>Remisy/inne: {headToHead.draws}</p>
             </div>
           )}
+
+          <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+            <h3 style={{ ...titleStyle, fontSize: '0.95rem', marginBottom: '8px' }}>Top ELO</h3>
+            {leaderboard.length === 0 ? (
+              <p style={mutedStyle}>Brak danych rankingu.</p>
+            ) : (
+              <div style={{ display: 'grid', gap: '6px' }}>
+                {leaderboard.map((row) => (
+                  <div key={row.userId} style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', fontSize: '0.84rem' }}>
+                    <span>#{row.rank} {row.username}</span>
+                    <b style={{ color: '#fbbf24' }}>{row.elo}</b>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       </div>
     </div>
@@ -223,4 +260,5 @@ const chipStyle = {
   cursor: 'pointer',
   fontSize: '0.8rem',
 }
+
 

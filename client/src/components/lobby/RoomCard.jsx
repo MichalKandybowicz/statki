@@ -15,6 +15,7 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
     room.players?.[0] === currentUserId
 
   const hasPassword = room.hasPassword || !!room.password
+  const isRanked = !!room.isRanked
   const statusColors = { waiting: '#22c55e', setup: '#38bdf8', in_game: '#f59e0b', finished: '#64748b' }
   const statusColor = statusColors[room.status] || '#94a3b8'
   const isDeleting = deletingRoomId === roomId
@@ -31,6 +32,19 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
           )}
           <span style={{ color: statusColor, fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>
             {room.status || 'waiting'}
+          </span>
+          <span
+            style={{
+              color: isRanked ? '#fbbf24' : '#94a3b8',
+              background: isRanked ? 'rgba(245,158,11,0.12)' : 'rgba(148,163,184,0.1)',
+              border: isRanked ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(148,163,184,0.2)',
+              fontSize: '0.68rem',
+              fontWeight: 700,
+              borderRadius: '999px',
+              padding: '2px 7px',
+            }}
+          >
+            {isRanked ? 'RANKED' : 'CASUAL'}
           </span>
         </div>
         <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '6px' }}>

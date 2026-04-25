@@ -24,6 +24,10 @@ const roomSchema = new mongoose.Schema({
     enum: ['waiting', 'setup', 'in_game', 'finished'],
     default: 'waiting',
   },
+  isRanked: {
+    type: Boolean,
+    default: false,
+  },
   gameId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Game',

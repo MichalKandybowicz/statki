@@ -61,6 +61,7 @@ async function initGame(room, playerFleets, templateTiles = null) {
     players: playerIds,
     boardSize,
     turnTimeLimit: room.settings.turnTimeLimit || 60,
+    isRanked: !!room.isRanked,
     boards,
     fleets,
     turn: firstPlayer,

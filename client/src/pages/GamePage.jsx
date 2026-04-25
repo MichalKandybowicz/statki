@@ -31,7 +31,7 @@ export default function GamePage() {
   const { gameId } = useParams()
   const navigate = useNavigate()
   const socket = useSocket()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const myId = user?._id
   const {
     boards,
@@ -40,6 +40,7 @@ export default function GamePage() {
     turnStartedAt,
     turnTimeLimit,
     status,
+    isRanked,
     winnerId,
     boardSize,
     clearGame,
@@ -60,6 +61,7 @@ export default function GamePage() {
    const [watchingPlayerId, setWatchingPlayerId] = useState(null)
    const [swapBoards, setSwapBoards] = useState(false)
    const [headToHeadAfterBattle, setHeadToHeadAfterBattle] = useState(null)
+   const [gameOverMeta, setGameOverMeta] = useState(null)
   const previousTurnRef = useRef(null)
   const pendingEffectTimeoutsRef = useRef([])
   const pendingEffectsUntilRef = useRef(0)
@@ -317,9 +319,10 @@ export default function GamePage() {
       appendLogEntry(`Zmiana tury: ${turnText}`, 'turn')
     }
 
-  const onGameOver = ({ winnerId: winner, surrenderedBy }) => {
+  const onGameOver = ({ winnerId: winner, surrenderedBy, isRanked: rankedMode, eloChanges }) => {
       const surrenderNote = surrenderedBy && surrenderedBy !== myId ? ' (przeciwnik sie poddal)' : surrenderedBy === myId ? ' (poddales sie)' : ''
       appendLogEntry((winner === myId ? 'Koniec gry: wygrywasz' : 'Koniec gry: przegrywasz') + surrenderNote, 'over')
+      setGameOverMeta({ winnerId: winner, surrenderedBy, isRanked: rankedMode, eloChanges })
     }
 
     socket.on('error', onError)
@@ -362,7 +365,13 @@ export default function GamePage() {
      clearPendingEffects()
      setWatchingPlayerId(null)
      setSwapBoards(false)
+     setGameOverMeta(null)
    }, [gameId, clearPendingEffects])
+
+  useEffect(() => {
+    if (!myId || !gameOverMeta?.eloChanges?.[myId]) return
+    refreshUser?.().catch(() => {})
+  }, [gameOverMeta, myId, refreshUser])
 
    // Inicjalizuj obserwowanego gracza na siebie
    useEffect(() => {
@@ -379,7 +388,8 @@ export default function GamePage() {
    const iWon = winnerId === myId
    const selectedShip = myFleet?.[selectedShipIndex] || null
    const selectedAbility = getAbilityInfo(selectedShip?.abilityType, selectedShip?.positions?.length || 1)
-   
+   const myEloChange = gameOverMeta?.eloChanges?.[myId] || null
+
    const watchedBoard = watchingPlayerId ? boards[watchingPlayerId] : null
    const isWatchingOwnBoard = watchingPlayerId === myId
 
@@ -601,6 +611,21 @@ export default function GamePage() {
             <div style={{ fontSize:'3.5rem', marginBottom:'12px' }}>{iWon ? '🏆' : '💀'}</div>
             <h2 style={{ color:'#e2e8f0', fontSize:'1.8rem', marginBottom:'8px' }}>{iWon ? 'Zwycięstwo!' : 'Porażka'}</h2>
             <p style={{ color:'#64748b', marginBottom:'28px' }}>{iWon ? 'Zatopiłeś wszystkie statki przeciwnika!' : 'Twoja flota została zniszczona.'}</p>
+            {(gameOverMeta?.isRanked ?? isRanked) && (
+              <div style={{ marginBottom:'14px', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.28)', borderRadius:'10px', padding:'10px 14px' }}>
+                <div style={{ color:'#fbbf24', fontSize:'0.78rem', marginBottom:'3px', textTransform:'uppercase', letterSpacing:'0.06em', fontWeight:700 }}>Mecz rankingowy</div>
+                {myEloChange ? (
+                  <div style={{ color:'#e2e8f0', fontSize:'0.95rem', fontWeight:700 }}>
+                    ELO: {myEloChange.before} {'->'} {myEloChange.after}
+                    <span style={{ color: myEloChange.delta >= 0 ? '#22c55e' : '#f87171', marginLeft:'8px' }}>
+                      ({myEloChange.delta >= 0 ? '+' : ''}{myEloChange.delta})
+                    </span>
+                  </div>
+                ) : (
+                  <div style={{ color:'#cbd5e1', fontSize:'0.88rem' }}>Wynik rankingowy zapisany.</div>
+                )}
+              </div>
+            )}
             {headToHeadAfterBattle && (
               <div style={{ marginBottom:'18px', background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)', borderRadius:'10px', padding:'10px 14px' }}>
                 <div style={{ color:'#94a3b8', fontSize:'0.78rem', marginBottom:'4px' }}>Bilans z {headToHeadAfterBattle.opponent?.username || 'przeciwnikiem'}</div>

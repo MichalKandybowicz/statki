@@ -42,7 +42,14 @@ const userSchema = new mongoose.Schema({
     ],
     default: [],
   },
+  elo: {
+    type: Number,
+    default: 800,
+    min: 100,
+  },
 });
+
+userSchema.index({ elo: -1, createdAt: 1 });
 
 userSchema.methods.toSafeObject = function () {
   const obj = this.toObject();

@@ -7,6 +7,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
   const [turnTimeLimit, setTurnTimeLimit] = useState(60)
   const [shipLimit, setShipLimit] = useState(5)
   const [password, setPassword] = useState('')
+  const [isRanked, setIsRanked] = useState(false)
   const [boardTemplateId, setBoardTemplateId] = useState('')
   const [availableBoards, setAvailableBoards] = useState([])
   const [boardsLoading, setBoardsLoading] = useState(true)
@@ -42,6 +43,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
       turnTimeLimit,
       shipLimit,
       boardTemplateId,
+      isRanked,
     }
     if (password) data.password = password
     onSubmit(data)
@@ -130,6 +132,21 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
                 style={inputStyle}
                 placeholder="Zostaw puste dla pokoju publicznego"
               />
+            </div>
+
+            <div style={{ ...fieldStyle, marginTop: '-2px' }}>
+              <label style={{ ...labelStyle, marginBottom: '6px' }}>Tryb gry</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0', fontSize: '0.88rem', cursor: 'pointer' }}>
+                <input
+                  type='checkbox'
+                  checked={isRanked}
+                  onChange={(e) => setIsRanked(e.target.checked)}
+                />
+                Rankingowa (ELO startowe: 800)
+              </label>
+              <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '6px' }}>
+                ELO zmienia się tylko po meczach rankingowych.
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '8px' }}>

@@ -175,7 +175,7 @@ export default function GameSetupPage() {
           <h1 style={{ color:'#e2e8f0', marginBottom:'6px' }}>Ustawianie floty</h1>
           {room && (
             <p style={{ color:'#64748b', fontSize:'0.85rem' }}>
-              Plansza: {boardSize}×{boardSize} · Limit statków: {shipLimit} · Tura: {room.settings?.turnTimeLimit}s
+              Plansza: {boardSize}×{boardSize} · Limit statków: {shipLimit} · Tura: {room.settings?.turnTimeLimit}s · Tryb: {room?.isRanked ? 'Rankingowy' : 'Nierankingowy'}
             </p>
           )}
         </div>

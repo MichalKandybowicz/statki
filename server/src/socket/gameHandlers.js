@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const Game = require('../models/Game');
+const User = require('../models/User');
 const BoardTemplate = require('../models/BoardTemplate');
 const ShipTemplate = require('../models/ShipTemplate');
 const { initGame, processMove, checkWinCondition, getPlayerView } = require('../engine/gameEngine');
@@ -8,6 +9,7 @@ const { endTurn, checkSkips } = require('../engine/turnEngine');
 const { validatePlacement } = require('../utils/shipPlacement');
 const { emitToUser } = require('./socketUtils');
 const { ensureUniqueRoomPlayers, getPlayerUserId } = require('../utils/roomPlayers');
+const { calculateRatedMatch } = require('../services/eloService');
 
 // Per-game fleet staging: Map<roomId, Map<userId, fleet>>
 const stagedFleets = new Map();
@@ -21,6 +23,7 @@ function getPlayerGamePayload(game, playerId) {
     turn: game.turn ? game.turn.toString() : null,
     turnStartedAt: game.turnStartedAt,
     status: game.status,
+    isRanked: !!game.isRanked,
     winnerId: game.winnerId ? game.winnerId.toString() : null,
     skips: Object.fromEntries(game.skips || []),
     players: game.players.map((p) => p.toString()),
@@ -46,6 +49,60 @@ function markGameAsFinished(game, { winnerId = null, endReason = 'win', finished
   game.endReason = endReason;
   game.finishedBy = finishedBy || null;
   game.endedAt = new Date();
+}
+
+async function applyRankedEloIfNeeded(game) {
+  if (!game?.isRanked || game.eloApplied) return null;
+
+  const players = (game.players || []).map((p) => p.toString());
+  const winnerId = game.winnerId ? game.winnerId.toString() : null;
+  if (players.length !== 2 || !winnerId) return null;
+
+  const loserId = players.find((id) => id !== winnerId);
+  if (!loserId) return null;
+
+  const users = await User.find({ _id: { $in: players } });
+  const byId = new Map(users.map((u) => [u._id.toString(), u]));
+  const winner = byId.get(winnerId);
+  const loser = byId.get(loserId);
+  if (!winner || !loser) return null;
+
+  const result = calculateRatedMatch({ winnerElo: winner.elo, loserElo: loser.elo });
+
+  winner.elo = result.winner.after;
+  loser.elo = result.loser.after;
+  await Promise.all([winner.save(), loser.save()]);
+
+  const eloChanges = {
+    [winnerId]: result.winner,
+    [loserId]: result.loser,
+  };
+
+  game.eloApplied = true;
+  game.eloDeltas = {
+    [winnerId]: result.winner.delta,
+    [loserId]: result.loser.delta,
+  };
+  game.eloBefore = {
+    [winnerId]: result.winner.before,
+    [loserId]: result.loser.before,
+  };
+  game.eloAfter = {
+    [winnerId]: result.winner.after,
+    [loserId]: result.loser.after,
+  };
+
+  return eloChanges;
+}
+
+function buildGameOverPayload({ game, winnerId, surrenderedBy = null, eloChanges = null }) {
+  const payload = {
+    winnerId: winnerId ? winnerId.toString() : null,
+    isRanked: !!game?.isRanked,
+  };
+  if (surrenderedBy) payload.surrenderedBy = surrenderedBy;
+  if (eloChanges) payload.eloChanges = eloChanges;
+  return payload;
 }
 
 async function closeRoomAfterGame(io, roomId) {
@@ -84,14 +141,19 @@ function scheduleTurnTimer(io, connectedUsers, turnTimers, game, room) {
           endReason: 'timeout',
           finishedBy: currentPlayerId,
         });
+        const eloChanges = await applyRankedEloIfNeeded(freshGame);
         await freshGame.save();
 
         await closeRoomAfterGame(io, freshGame.roomId);
 
         for (const pid of freshGame.players) {
-          emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
-            winnerId: winnerId ? winnerId.toString() : null,
-          });
+          emitToUser(
+            io,
+            connectedUsers,
+            pid.toString(),
+            'game_over',
+            buildGameOverPayload({ game: freshGame, winnerId, eloChanges })
+          );
         }
         return;
       }
@@ -285,6 +347,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           endReason: 'win',
           finishedBy: userId,
         });
+        const eloChanges = await applyRankedEloIfNeeded(game);
         await game.save();
 
         await closeRoomAfterGame(io, game.roomId);
@@ -303,7 +366,13 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
             boards: getPlayerView(game, pidStr),
             fleet: game.fleets.get(pidStr) || [],
           });
-          emitToUser(io, connectedUsers, pid.toString(), 'game_over', { winnerId });
+          emitToUser(
+            io,
+            connectedUsers,
+            pid.toString(),
+            'game_over',
+            buildGameOverPayload({ game, winnerId, eloChanges })
+          );
         }
         return;
       }
@@ -444,6 +513,7 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           endReason: 'win',
           finishedBy: userId,
         });
+        const eloChanges = await applyRankedEloIfNeeded(game);
         await game.save();
         await closeRoomAfterGame(io, game.roomId);
         clearTurnTimer(turnTimers, gameId);
@@ -458,7 +528,13 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
             boards: getPlayerView(game, pidStr),
             fleet: game.fleets.get(pidStr) || [],
           });
-          emitToUser(io, connectedUsers, pid.toString(), 'game_over', { winnerId });
+          emitToUser(
+            io,
+            connectedUsers,
+            pid.toString(),
+            'game_over',
+            buildGameOverPayload({ game, winnerId, eloChanges })
+          );
         }
         return;
       }
@@ -506,16 +582,20 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         endReason: 'surrender',
         finishedBy: userId,
       });
+      const eloChanges = await applyRankedEloIfNeeded(game);
       await game.save();
 
       clearTurnTimer(turnTimers, gameId);
       await closeRoomAfterGame(io, game.roomId);
 
       for (const pid of game.players) {
-        emitToUser(io, connectedUsers, pid.toString(), 'game_over', {
-          winnerId: winnerId ? winnerId.toString() : null,
-          surrenderedBy: userId,
-        });
+        emitToUser(
+          io,
+          connectedUsers,
+          pid.toString(),
+          'game_over',
+          buildGameOverPayload({ game, winnerId, surrenderedBy: userId, eloChanges })
+        );
       }
     } catch (err) {
       console.error('surrender error:', err);

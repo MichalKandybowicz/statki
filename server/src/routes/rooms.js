@@ -35,7 +35,7 @@ router.get('/', async (req, res) => {
 // POST /api/rooms - create room
 router.post('/', async (req, res) => {
   try {
-    const { turnTimeLimit = 60, shipLimit = 5, password, boardTemplateId } = req.body;
+    const { turnTimeLimit = 60, shipLimit = 5, password, boardTemplateId, isRanked = false } = req.body;
 
     if (!boardTemplateId) {
       return res.status(400).json({ error: 'boardTemplateId is required' });
@@ -46,6 +46,9 @@ router.post('/', async (req, res) => {
     if (shipLimit < 1 || shipLimit > 10) {
       return res.status(400).json({ error: 'shipLimit must be between 1 and 10' });
     }
+    if (typeof isRanked !== 'boolean') {
+      return res.status(400).json({ error: 'isRanked must be a boolean' });
+    }
 
     const boardTemplate = await BoardTemplate.findOne({ _id: boardTemplateId, ownerId: req.user._id }).lean();
     if (!boardTemplate) {
@@ -55,6 +58,7 @@ router.post('/', async (req, res) => {
     const room = new Room({
       hostId: req.user._id,
       players: [{ userId: req.user._id, ready: false }],
+      isRanked,
       settings: {
         boardSize: boardTemplate.size,
         turnTimeLimit,

@@ -80,7 +80,10 @@ export default function LobbyPage() {
   return (
     <div style={{ maxWidth: '860px', margin: '0 auto', padding: '32px 20px' }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'24px' }}>
-        <h1 style={{ color:'#e2e8f0', fontSize:'1.6rem', fontWeight:'700' }}>Game Lobby</h1>
+        <div>
+          <h1 style={{ color:'#e2e8f0', fontSize:'1.6rem', fontWeight:'700', margin:'0 0 4px' }}>Game Lobby</h1>
+          <div style={{ color:'#94a3b8', fontSize:'0.82rem' }}>Twoje ELO: <b style={{ color:'#fbbf24' }}>{user?.elo ?? 800}</b></div>
+        </div>
         <button onClick={() => setShowModal(true)} style={{ background:'#2563eb', color:'white', border:'none', borderRadius:'8px', padding:'10px 20px', fontWeight:'600', cursor:'pointer' }}>+ Create Room</button>
       </div>
       {lobbyError && (

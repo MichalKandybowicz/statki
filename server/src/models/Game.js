@@ -51,6 +51,7 @@ const gameSchema = new mongoose.Schema({
   },
   lastActionAt: { type: Date, default: Date.now },
   turnStartedAt: { type: Date, default: null },
+  isRanked: { type: Boolean, default: false },
   status: {
     type: String,
     enum: ['waiting', 'setup', 'in_game', 'finished'],
@@ -64,6 +65,22 @@ const gameSchema = new mongoose.Schema({
   },
   finishedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   endedAt: { type: Date, default: null },
+  eloApplied: { type: Boolean, default: false },
+  eloDeltas: {
+    type: Map,
+    of: Number,
+    default: {},
+  },
+  eloBefore: {
+    type: Map,
+    of: Number,
+    default: {},
+  },
+  eloAfter: {
+    type: Map,
+    of: Number,
+    default: {},
+  },
 }, {
   timestamps: true,
 });
