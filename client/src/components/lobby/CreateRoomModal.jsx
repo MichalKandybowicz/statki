@@ -142,7 +142,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
                   checked={isRanked}
                   onChange={(e) => setIsRanked(e.target.checked)}
                 />
-                Rankingowa (ELO startowe: 800)
+                Rankingowa
               </label>
               <div style={{ color: '#64748b', fontSize: '0.75rem', marginTop: '6px' }}>
                 ELO zmienia się tylko po meczach rankingowych.
