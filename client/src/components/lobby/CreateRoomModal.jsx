@@ -203,7 +203,7 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
 
         {boardsLoading ? (
           <p style={{ color: '#64748b', fontSize: '0.9rem' }}>Ładowanie plansz…</p>
-        ) : boardsError ? (
+        ) : allBoards.length === 0 && boardsError ? (
           <div style={{ color: '#94a3b8', fontSize: '0.9rem', lineHeight: 1.6 }}>
             <div style={{ marginBottom: '8px' }}>{boardsError}</div>
             <button
@@ -220,6 +220,11 @@ export default function CreateRoomModal({ onClose, onSubmit, loading, error }) {
           </div>
         ) : (
           <form onSubmit={handleSubmit}>
+            {boardsError && (
+              <div style={{ ...errorStyle, marginBottom: '12px', color: '#fbbf24', borderColor: 'rgba(245,158,11,0.28)', background: 'rgba(245,158,11,0.08)' }}>
+                {boardsError}
+              </div>
+            )}
             {/* Board picker */}
             <div style={fieldStyle}>
               <label style={labelStyle}>Plansza</label>
