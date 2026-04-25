@@ -6,11 +6,13 @@ const ShipTemplate = require('../models/ShipTemplate');
 const { initGame, processMove, checkWinCondition, getPlayerView } = require('../engine/gameEngine');
 const {
   useLinearShot,
+  useDiagonalShot,
   useRandomShot,
   useTargetShot,
   useSonar,
   useScoutRocket,
   useHolyBomb,
+  useShipShapeShot,
   tickCooldowns,
 } = require('../engine/abilityEngine');
 const { endTurn, checkSkips } = require('../engine/turnEngine');
@@ -471,6 +473,9 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
         case 'linear':
           results = useLinearShot(game, userId, shipIndex, targets?.[0], orientation);
           break;
+        case 'diagonal':
+          results = useDiagonalShot(game, userId, shipIndex, targets?.[0], orientation);
+          break;
         case 'random':
           results = useRandomShot(game, userId, shipIndex);
           break;
@@ -482,6 +487,9 @@ function registerGameHandlers(io, socket, connectedUsers, turnTimers) {
           break;
         case 'holy_bomb':
           results = useHolyBomb(game, userId, shipIndex, targets?.[0]);
+          break;
+        case 'ship_shape':
+          results = useShipShapeShot(game, userId, shipIndex, targets?.[0]);
           break;
         case 'sonar': {
           const sonarResult = useSonar(game, userId, shipIndex, targets?.[0]);

@@ -269,11 +269,13 @@ export default function ShipBuilderPage() {
             >
               <option value="all">Wszystkie zdolności</option>
               <option value="linear">Liniowy strzał</option>
+              <option value="diagonal">Ostrzał skośny</option>
               <option value="random">Losowy ostrzał</option>
               <option value="target">Atak obszarowy</option>
               <option value="sonar">Sonar</option>
               <option value="scout_rocket">Rakieta zwiadowcza</option>
               <option value="holy_bomb">Święta bomba</option>
+              <option value="ship_shape">Ostrzał w kształcie statku</option>
             </select>
             <select
               value={communityFilters.size}

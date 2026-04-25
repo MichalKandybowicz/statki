@@ -11,14 +11,24 @@ export function getAbilityInfo(type, size = 1) {
         key: 'linear',
         label: 'Salwa liniowa',
         shortLabel: 'Liniowa',
-        cooldown: normalizedSize,
+        cooldown: normalizedSize + 1,
         description: `Wybierasz początek i kierunek salwy (poziomo lub pionowo). Strzał obejmuje dokładnie ${normalizedSize} pól w jednej linii.`,
         targeting: 'Wymaga wskazania pola startowego oraz kierunku poziomo/pionowo.',
         requirement: 'Minimalny rozmiar statku: 2 pola.',
       }
+    case 'diagonal':
+      return {
+        key: 'diagonal',
+        label: 'Ostrzał skośny',
+        shortLabel: 'Skośny',
+        cooldown: normalizedSize + 1,
+        description: `Wybierasz początek i jedną z dwóch przekątnych. Ostrzał obejmuje dokładnie ${normalizedSize} pól po skosie.`,
+        targeting: 'Wymaga wskazania pola startowego oraz kierunku skosu. Klawisz R zmienia przekątną.',
+        requirement: 'Rozmiar statku: 3-5 pól.',
+      }
     case 'random': {
       const shotCount = Math.max(1, normalizedSize - 1)
-      const cooldown = normalizedSize + 1
+      const cooldown = normalizedSize
       return {
         key: 'random',
         label: 'Strzał losowy',
@@ -43,7 +53,7 @@ export function getAbilityInfo(type, size = 1) {
     }
     case 'sonar': {
       const scanCount = Math.ceil(normalizedSize / 3)
-      const cooldown = scanCount * 3
+      const cooldown = scanCount * 3 + 1
       return {
         key: 'sonar',
         label: 'Sonar',
@@ -59,7 +69,7 @@ export function getAbilityInfo(type, size = 1) {
         key: 'scout_rocket',
         label: 'Rakieta zwiadowcza',
         shortLabel: 'Zwiad',
-        cooldown: 5,
+        cooldown: normalizedSize + 3,
         description: 'Oddajesz pojedynczy strzał. Jeśli trafi, wszystkie pola trafionego statku zostają oznaczone jako wykryte.',
         targeting: 'Wymaga wskazania jednego pola na planszy przeciwnika.',
         requirement: 'Rozmiar statku: 4-6 pól.',
@@ -74,6 +84,16 @@ export function getAbilityInfo(type, size = 1) {
         targeting: 'Wybierz pole oznaczone jako wykryte.',
         requirement: 'Rozmiar statku: dokładnie 7 pól.',
       }
+    case 'ship_shape':
+      return {
+        key: 'ship_shape',
+        label: 'Ostrzał w kształcie statku',
+        shortLabel: 'Kształt',
+        cooldown: normalizedSize,
+        description: 'Atak odwzorowuje aktualny kształt i orientację Twojego statku. Wybierasz punkt zaczepienia, a salwa pokrywa cały ten wzór.',
+        targeting: 'Wymaga wskazania pola lewego-górnego dla wzoru ostrzału.',
+        requirement: 'Rozmiar statku: 2-6 pól.',
+      }
     default:
       return {
         key: type || 'unknown',
@@ -87,7 +107,7 @@ export function getAbilityInfo(type, size = 1) {
   }
 }
 
-export const ABILITY_TYPES = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb']
+export const ABILITY_TYPES = ['linear', 'diagonal', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb', 'ship_shape']
 
 export function getAbilityCards(size = 1) {
   return ABILITY_TYPES.map(type => getAbilityInfo(type, size))

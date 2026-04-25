@@ -66,12 +66,16 @@ export default function AbilityPanel({
               ? 'Wybierz cele'
               : ship.abilityType === 'linear'
                 ? 'Wybierz linię'
+                : ship.abilityType === 'diagonal'
+                  ? 'Wybierz skos'
                 : ship.abilityType === 'sonar'
                   ? 'Wybierz punkt skanu'
                   : ship.abilityType === 'scout_rocket'
                     ? 'Wybierz cel rakiety'
                     : ship.abilityType === 'holy_bomb'
                       ? 'Wybierz wykryte pole'
+                      : ship.abilityType === 'ship_shape'
+                        ? 'Wybierz punkt zaczepienia'
                   : 'Użyj umiejętności'}
           </button>
         </div>
@@ -82,23 +86,36 @@ export default function AbilityPanel({
               <div style={{ marginBottom: '8px', lineHeight: 1.45 }}>
                 🎯 {ship.name || `Statek ${selectedShipIndex + 1}`} — {targetingMode.type === 'linear'
                   ? `kliknij początek salwy (${linearDirection === 'horizontal' ? 'poziomo' : 'pionowo'}, długość ${ship.positions?.length || 1})`
+                  : targetingMode.type === 'diagonal'
+                    ? `kliknij początek salwy (${linearDirection === 'down-right' ? '↘ skos w dół' : '↙ skos w dół'}, długość ${ship.positions?.length || 1})`
                   : targetingMode.type === 'sonar'
                     ? 'kliknij pole, z którego ma pójść impuls sonaru'
                     : targetingMode.type === 'scout_rocket'
                       ? 'kliknij pojedyncze pole celu rakiety zwiadowczej'
                       : targetingMode.type === 'holy_bomb'
                         ? 'kliknij pole oznaczone jako wykryte'
+                      : targetingMode.type === 'ship_shape'
+                        ? 'kliknij pole lewego-górnego rogu wzoru ostrzału'
                     : `wybierz do ${targetingMode.maxTargets} pól (${targetingMode.targets.length}/${targetingMode.maxTargets})`}
               </div>
 
-              {targetingMode.type === 'linear' && linearPreviewInvalid && (
+              {(targetingMode.type === 'linear' || targetingMode.type === 'diagonal' || targetingMode.type === 'ship_shape') && linearPreviewInvalid && (
                 <div style={{ color: '#f87171', marginBottom: '8px' }}>Linia wychodzi poza planszę</div>
               )}
 
-              {targetingMode.type === 'linear' && (
+              {(targetingMode.type === 'linear' || targetingMode.type === 'diagonal') && (
                 <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
-                  <button onClick={() => onSetLinearDirection?.('horizontal')} style={{ ...directionBtnStyle, opacity: linearDirection === 'horizontal' ? 1 : 0.6 }}>Poziomo</button>
-                  <button onClick={() => onSetLinearDirection?.('vertical')} style={{ ...directionBtnStyle, opacity: linearDirection === 'vertical' ? 1 : 0.6 }}>Pionowo</button>
+                  {targetingMode.type === 'linear' ? (
+                    <>
+                      <button onClick={() => onSetLinearDirection?.('horizontal')} style={{ ...directionBtnStyle, opacity: linearDirection === 'horizontal' ? 1 : 0.6 }}>Poziomo</button>
+                      <button onClick={() => onSetLinearDirection?.('vertical')} style={{ ...directionBtnStyle, opacity: linearDirection === 'vertical' ? 1 : 0.6 }}>Pionowo</button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => onSetLinearDirection?.('down-right')} style={{ ...directionBtnStyle, opacity: linearDirection === 'down-right' ? 1 : 0.6 }}>↘</button>
+                      <button onClick={() => onSetLinearDirection?.('down-left')} style={{ ...directionBtnStyle, opacity: linearDirection === 'down-left' ? 1 : 0.6 }}>↙</button>
+                    </>
+                  )}
                 </div>
               )}
 

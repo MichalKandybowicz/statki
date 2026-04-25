@@ -140,6 +140,21 @@ function isBlockedByObstacle(hiddenBoard, start, end) {
   return false;
 }
 
+function getOrientationStep(orientation, supported, label) {
+  const mapping = supported[orientation];
+  if (!mapping) {
+    throw new Error(`${label} orientation is invalid`);
+  }
+  return mapping;
+}
+
+function getRelativeShipPattern(positions) {
+  if (!Array.isArray(positions) || positions.length === 0) return [];
+  const minX = Math.min(...positions.map((pos) => pos.x));
+  const minY = Math.min(...positions.map((pos) => pos.y));
+  return positions.map((pos) => ({ dx: pos.x - minX, dy: pos.y - minY }));
+}
+
 /**
  * Linear shot: fires a segment chosen by the player horizontally or vertically.
  */
@@ -177,6 +192,55 @@ function useLinearShot(game, playerId, shipIndex, target, orientation = 'horizon
   }
 
   applyCooldown(fleet, shipIndex, getAbilityCooldown('linear', length));
+  game.fleets.set(playerId.toString(), fleet);
+  game.markModified('fleets');
+
+  return results;
+}
+
+/**
+ * Diagonal shot: fires along a selected diagonal direction.
+ */
+function useDiagonalShot(game, playerId, shipIndex, target, orientation = 'down-right') {
+  const { fleet, rules } = validateShipForAbility(game, playerId, shipIndex);
+  if (!target || target.x === undefined || target.y === undefined) {
+    throw new Error('Target start point is required for diagonal shot');
+  }
+
+  const { dx, dy } = getOrientationStep(
+    orientation,
+    {
+      'down-right': { dx: 1, dy: 1 },
+      'down-left': { dx: -1, dy: 1 },
+    },
+    'Diagonal shot'
+  );
+
+  const length = rules.segmentLength;
+  const results = [];
+
+  for (let step = 0; step < length; step++) {
+    const x = target.x + dx * step;
+    const y = target.y + dy * step;
+
+    if (x < 0 || x >= game.boardSize || y < 0 || y >= game.boardSize) {
+      results.push({ x, y, hit: false, sunk: false, error: 'Out of bounds' });
+      continue;
+    }
+
+    const result = processMove(game, playerId, x, y);
+    results.push({
+      x,
+      y,
+      hit: result.hit,
+      sunk: result.sunk,
+      shipIndex: result.shipIndex,
+      sunkPositions: result.sunkPositions || [],
+      alreadyShot: result.alreadyShot,
+    });
+  }
+
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('diagonal', length));
   game.fleets.set(playerId.toString(), fleet);
   game.markModified('fleets');
 
@@ -451,6 +515,49 @@ function useHolyBomb(game, playerId, shipIndex, target) {
 }
 
 /**
+ * Ship-shape shot: fires using the current ship layout as a target stencil.
+ */
+function useShipShapeShot(game, playerId, shipIndex, target) {
+  const { fleet, ship, size } = validateShipForAbility(game, playerId, shipIndex);
+  if (!target || target.x === undefined || target.y === undefined) {
+    throw new Error('Target anchor is required for ship-shape shot');
+  }
+
+  const pattern = getRelativeShipPattern(ship.positions);
+  if (pattern.length === 0) {
+    throw new Error('Ship-shape pattern is empty');
+  }
+
+  const results = [];
+  for (const { dx, dy } of pattern) {
+    const x = target.x + dx;
+    const y = target.y + dy;
+
+    if (x < 0 || x >= game.boardSize || y < 0 || y >= game.boardSize) {
+      results.push({ x, y, hit: false, sunk: false, error: 'Out of bounds' });
+      continue;
+    }
+
+    const result = processMove(game, playerId, x, y);
+    results.push({
+      x,
+      y,
+      hit: result.hit,
+      sunk: result.sunk,
+      shipIndex: result.shipIndex,
+      sunkPositions: result.sunkPositions || [],
+      alreadyShot: result.alreadyShot,
+    });
+  }
+
+  applyCooldown(fleet, shipIndex, getAbilityCooldown('ship_shape', size));
+  game.fleets.set(playerId.toString(), fleet);
+  game.markModified('fleets');
+
+  return results;
+}
+
+/**
  * Decrements all cooldowns for a player's fleet at the start of their turn.
  */
 function tickCooldowns(game, playerId) {
@@ -467,10 +574,12 @@ function tickCooldowns(game, playerId) {
 
 module.exports = {
   useLinearShot,
+  useDiagonalShot,
   useRandomShot,
   useTargetShot,
   useSonar,
   useScoutRocket,
   useHolyBomb,
+  useShipShapeShot,
   tickCooldowns,
 };

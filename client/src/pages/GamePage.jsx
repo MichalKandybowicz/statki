@@ -114,6 +114,13 @@ export default function GamePage() {
     return `${String.fromCharCode(65 + y)}${x + 1}`
   }, [])
 
+  const getShipPatternOffsets = useCallback((positions) => {
+    if (!Array.isArray(positions) || positions.length === 0) return []
+    const minX = Math.min(...positions.map(pos => pos.x))
+    const minY = Math.min(...positions.map(pos => pos.y))
+    return positions.map(pos => ({ dx: pos.x - minX, dy: pos.y - minY }))
+  }, [])
+
    useEffect(() => {
      try {
        const raw = localStorage.getItem(SOUND_SETTINGS_KEY)
@@ -473,22 +480,56 @@ export default function GamePage() {
     if (selectedShipIndex >= myFleet.length) setSelectedShipIndex(0)
   }, [myFleet, selectedShipIndex])
 
+  useEffect(() => {
+    if (!targetingMode || !['linear', 'diagonal'].includes(targetingMode.type)) return
+
+    function onKeyDown(e) {
+      if (e.key !== 'r' && e.key !== 'R') return
+      e.preventDefault()
+      setLinearDirection(prev => {
+        if (targetingMode.type === 'linear') {
+          return prev === 'vertical' ? 'horizontal' : 'vertical'
+        }
+        return prev === 'down-left' ? 'down-right' : 'down-left'
+      })
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [targetingMode])
+
 
   const pendingTargets = useMemo(() => targetingMode?.targets || [], [targetingMode])
   const linearPreview = useMemo(() => {
-    if (!targetingMode || targetingMode.type !== 'linear' || !linearHoverStart || !selectedShip) {
+    if (!targetingMode || !linearHoverStart || !selectedShip) {
       return { positions: [], invalid: false }
     }
 
     const length = selectedShip.positions?.length || 1
-    const raw = Array.from({ length }, (_, step) => ({
-      x: linearHoverStart.x + (linearDirection === 'horizontal' ? step : 0),
-      y: linearHoverStart.y + (linearDirection === 'vertical' ? step : 0),
-    }))
+    let raw = []
+
+    if (targetingMode.type === 'linear') {
+      raw = Array.from({ length }, (_, step) => ({
+        x: linearHoverStart.x + (linearDirection === 'horizontal' ? step : 0),
+        y: linearHoverStart.y + (linearDirection === 'vertical' ? step : 0),
+      }))
+    } else if (targetingMode.type === 'diagonal') {
+      raw = Array.from({ length }, (_, step) => ({
+        x: linearHoverStart.x + (linearDirection === 'down-left' ? -step : step),
+        y: linearHoverStart.y + step,
+      }))
+    } else if (targetingMode.type === 'ship_shape') {
+      raw = getShipPatternOffsets(selectedShip.positions || []).map(({ dx, dy }) => ({
+        x: linearHoverStart.x + dx,
+        y: linearHoverStart.y + dy,
+      }))
+    } else {
+      return { positions: [], invalid: false }
+    }
 
     const inBounds = raw.filter(({ x, y }) => x >= 0 && x < boardSize && y >= 0 && y < boardSize)
     return { positions: inBounds, invalid: inBounds.length !== raw.length }
-  }, [targetingMode, linearHoverStart, selectedShip, linearDirection, boardSize])
+  }, [targetingMode, linearHoverStart, selectedShip, linearDirection, boardSize, getShipPatternOffsets])
 
   const boardZoom = Number(battleLayout.boardZoom || 1)
   const enemyBoardMaxPx = useMemo(() => {
@@ -523,7 +564,7 @@ export default function GamePage() {
             linearDirection={linearDirection}
             onSetLinearDirection={setLinearDirection}
             onConfirmTarget={confirmTargetAbility}
-            linearPreviewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
+            linearPreviewInvalid={['linear', 'diagonal', 'ship_shape'].includes(targetingMode?.type) ? linearPreview.invalid : false}
           />
           </div>
         )}
@@ -542,16 +583,16 @@ export default function GamePage() {
           isOwnBoard={false}
           onTileClick={handleEnemyClick}
           onTileHover={(x, y) => {
-            if (targetingMode?.type === 'linear') setLinearHoverStart({ x, y })
+            if (['linear', 'diagonal', 'ship_shape'].includes(targetingMode?.type)) setLinearHoverStart({ x, y })
           }}
           onTileLeave={() => {
-            if (targetingMode?.type === 'linear') setLinearHoverStart(null)
+            if (['linear', 'diagonal', 'ship_shape'].includes(targetingMode?.type)) setLinearHoverStart(null)
           }}
           boardSize={boardSize}
           sonarPositions={enemySonarPositions}
           targetPositions={pendingTargets}
-          previewPositions={targetingMode?.type === 'linear' ? linearPreview.positions : []}
-          previewInvalid={targetingMode?.type === 'linear' ? linearPreview.invalid : false}
+          previewPositions={['linear', 'diagonal', 'ship_shape'].includes(targetingMode?.type) ? linearPreview.positions : []}
+          previewInvalid={['linear', 'diagonal', 'ship_shape'].includes(targetingMode?.type) ? linearPreview.invalid : false}
           isTargeting={!!targetingMode}
           targetingModeType={targetingMode?.type || null}
           maxBoardPx={enemyBoardMaxPx}
@@ -573,13 +614,25 @@ export default function GamePage() {
 
   function handleEnemyClick(x, y) {
     if (targetingMode) {
-      if (targetingMode.type === 'linear') {
+      if (targetingMode.type === 'linear' || targetingMode.type === 'diagonal') {
         if (linearPreview.invalid) return
         socket?.emit('use_ability', {
           gameId,
           shipIndex: targetingMode.shipIndex,
           targets: [{ x, y }],
           orientation: linearDirection,
+        })
+        setTargetingMode(null)
+        setLinearHoverStart(null)
+        return
+      }
+
+      if (targetingMode.type === 'ship_shape') {
+        if (linearPreview.invalid) return
+        socket?.emit('use_ability', {
+          gameId,
+          shipIndex: targetingMode.shipIndex,
+          targets: [{ x, y }],
         })
         setTargetingMode(null)
         setLinearHoverStart(null)
@@ -626,7 +679,15 @@ export default function GamePage() {
     if (!ship) return
 
     if (ship.abilityType === 'linear') {
+      setLinearDirection('horizontal')
       setTargetingMode({ type: 'linear', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
+      return
+    }
+
+    if (ship.abilityType === 'diagonal') {
+      setLinearDirection('down-right')
+      setTargetingMode({ type: 'diagonal', shipIndex, maxTargets: 1, targets: [] })
       setLinearHoverStart(null)
       return
     }
@@ -645,6 +706,12 @@ export default function GamePage() {
 
     if (ship.abilityType === 'holy_bomb') {
       setTargetingMode({ type: 'holy_bomb', shipIndex, maxTargets: 1, targets: [] })
+      setLinearHoverStart(null)
+      return
+    }
+
+    if (ship.abilityType === 'ship_shape') {
+      setTargetingMode({ type: 'ship_shape', shipIndex, maxTargets: 1, targets: [] })
       setLinearHoverStart(null)
       return
     }

@@ -1,10 +1,12 @@
 const {
   useLinearShot,
+  useDiagonalShot,
   useRandomShot,
   useTargetShot,
   useSonar,
   useScoutRocket,
   useHolyBomb,
+  useShipShapeShot,
   tickCooldowns,
 } = require('./src/engine/abilityEngine');
 const { processMove } = require('./src/engine/gameEngine');
@@ -81,6 +83,27 @@ function assert(condition, message) {
   assert(results.length === 2, 'linear should shoot exactly ship-size segment');
   assert(results[0].hit === true && results[1].hit === true, 'linear should hit both cells in chosen segment');
   assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('linear', 2), 'linear cooldown should follow config');
+})();
+
+(function testDiagonalShot() {
+  const game = makeGame(9);
+  const shooter = game.fleets.get('A')[0];
+  shooter.abilityType = 'diagonal';
+  shooter.positions = [{ x: 0, y: 8 }, { x: 1, y: 8 }, { x: 2, y: 8 }];
+  shooter.cooldownRemaining = 0;
+
+  game.fleets.set('B', [
+    { name: 'DiagTarget', abilityType: 'target', positions: [{ x: 2, y: 2 }, { x: 3, y: 3 }, { x: 4, y: 4 }], hits: [], isSunk: false, cooldownRemaining: 0 },
+  ]);
+  const hidden = makeBoard(9);
+  placeShips(hidden, game.fleets.get('B'));
+  game.boards.get('B').hidden = hidden;
+  game.boards.get('B').visible = makeBoard(9);
+
+  const results = useDiagonalShot(game, 'A', 0, { x: 2, y: 2 }, 'down-right');
+  assert(results.length === 3, 'diagonal should fire exactly ship-size segment');
+  assert(results.every((shot) => shot.hit === true), 'diagonal should hit along diagonal path');
+  assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('diagonal', 3), 'diagonal cooldown should follow config');
 })();
 
 (function testRandomShot() {
@@ -207,7 +230,7 @@ function assert(condition, message) {
   assert(results.length === 1 && results[0].hit === true, 'scout rocket should fire single shot and hit target');
   const visible = game.boards.get('B').visible;
   assert(visible[2][3] === 'detected', 'scout rocket should mark sibling ship cells as detected');
-  assert(game.fleets.get('A')[0].cooldownRemaining === 5, 'scout rocket cooldown should be 5');
+  assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('scout_rocket', 4), 'scout rocket cooldown should follow config');
 })();
 
 (function testHolyBombRequiresDetectedAndSinksWholeShip() {
@@ -236,6 +259,27 @@ function assert(condition, message) {
   assert(results.length >= 2, 'holy bomb should return all ship cells as sunk results');
   assert(game.fleets.get('B')[0].isSunk === true, 'holy bomb should sink entire target ship');
   assert(game.fleets.get('A')[0].cooldownRemaining === 11, 'holy bomb cooldown should be 11');
+})();
+
+(function testShipShapeShot() {
+  const game = makeGame(9);
+  const shooter = game.fleets.get('A')[0];
+  shooter.abilityType = 'ship_shape';
+  shooter.positions = [{ x: 0, y: 8 }, { x: 1, y: 8 }, { x: 1, y: 7 }];
+  shooter.cooldownRemaining = 0;
+
+  game.fleets.set('B', [
+    { name: 'ShapeTarget', abilityType: 'target', positions: [{ x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 1 }], hits: [], isSunk: false, cooldownRemaining: 0 },
+  ]);
+  const hidden = makeBoard(9);
+  placeShips(hidden, game.fleets.get('B'));
+  game.boards.get('B').hidden = hidden;
+  game.boards.get('B').visible = makeBoard(9);
+
+  const results = useShipShapeShot(game, 'A', 0, { x: 2, y: 1 });
+  assert(results.length === 3, 'ship-shape should shoot as many cells as ship has');
+  assert(results.filter((shot) => shot.hit).length === 3, 'ship-shape should hit all cells matching its stencil');
+  assert(game.fleets.get('A')[0].cooldownRemaining === getAbilityCooldown('ship_shape', 3), 'ship-shape cooldown should follow config');
 })();
 
 console.log('ability tests ok')

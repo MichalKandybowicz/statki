@@ -8,6 +8,13 @@ function getAbilityRules(type, size = 1) {
         cooldown: normalizedSize + 1,
         segmentLength: normalizedSize,
       };
+    case 'diagonal':
+      return {
+        minSize: 3,
+        maxSize: 5,
+        cooldown: normalizedSize + 1,
+        segmentLength: normalizedSize,
+      };
     case 'random':
       return {
         minSize: 2,
@@ -39,6 +46,12 @@ function getAbilityRules(type, size = 1) {
         minSize: 7,
         maxSize: 7,
         cooldown: 11,
+      };
+    case 'ship_shape':
+      return {
+        minSize: 2,
+        maxSize: 6,
+        cooldown: normalizedSize,
       };
     default:
       return {

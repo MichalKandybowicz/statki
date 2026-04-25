@@ -39,7 +39,7 @@ function validateName(name) {
 }
 
 function validateAbilityForSize(abilityType, size) {
-  const validAbilities = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb'];
+  const validAbilities = ['linear', 'diagonal', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb', 'ship_shape'];
   if (!validAbilities.includes(abilityType)) {
     return 'Invalid abilityType';
   }
@@ -74,7 +74,7 @@ router.get('/', async (req, res) => {
 router.get('/community', async (req, res) => {
   try {
     const { abilityType, name, size } = req.query;
-    const validAbilities = ['linear', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb'];
+    const validAbilities = ['linear', 'diagonal', 'random', 'target', 'sonar', 'scout_rocket', 'holy_bomb', 'ship_shape'];
 
     const query = {
       ownerId: { $ne: req.user._id },
