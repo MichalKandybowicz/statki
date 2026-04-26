@@ -235,6 +235,12 @@ export default function GameSetupPage() {
         : playersReady < 2
           ? `Do startu potrzeba 2 gotowych graczy (aktualnie: ${playersReady}/2).`
           : ''
+  const placedCount = localPlacedShips.length
+  const flowSteps = [
+    { label: 'Wybierz statki', done: placedCount > 0 },
+    { label: 'Ustaw na planszy', done: placedCount === shipLimit },
+    { label: 'Gotowy', done: isReady },
+  ]
 
   function handleStartGame() {
     if (!socket || !canStartGame) return
@@ -446,6 +452,37 @@ export default function GameSetupPage() {
       {error && (
         <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.25)', color:'#f87171', padding:'10px 14px', borderRadius:'8px', marginBottom:'16px', fontSize:'0.875rem' }}>
           {error}
+        </div>
+      )}
+
+      {!isReady && (
+        <div style={{ marginBottom: '14px', background: '#14263b', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '10px', padding: '12px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+            {flowSteps.map((step, index) => (
+              <div
+                key={step.label}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  background: step.done ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.05)',
+                  border: step.done ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                  color: step.done ? '#86efac' : '#cbd5e1',
+                  borderRadius: '999px',
+                  padding: '5px 10px',
+                  fontSize: '0.78rem',
+                  fontWeight: 600,
+                }}
+              >
+                <span>{index + 1}.</span>
+                <span>{step.label}</span>
+                <span>{step.done ? '✓' : ''}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ color: '#94a3b8', fontSize: '0.76rem' }}>
+            Drag ship onto board · Press R to rotate · Click ship to remove
+          </div>
         </div>
       )}
 
