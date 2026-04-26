@@ -515,10 +515,12 @@ export default function GameSetupPage() {
                   socket?.emit('place_fleet', { roomId, fleet })
                 }}
                 onFleetChange={setLocalPlacedShips}
-              />
-              <PlacedFleetSummary
-                placedShips={localPlacedShips}
-                availableShips={filteredShips}
+                sidePanel={(
+                  <PlacedFleetSummary
+                    placedShips={localPlacedShips}
+                    availableShips={filteredShips}
+                  />
+                )}
               />
             </div>
           )}
