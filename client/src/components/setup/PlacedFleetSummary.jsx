@@ -86,8 +86,9 @@ export default function PlacedFleetSummary({ placedShips, availableShips }) {
 }
 
 const summaryPanelStyle = {
-  minWidth: '260px',
-  maxWidth: '320px',
+  width: '100%',
+  minWidth: 0,
+  maxWidth: '100%',
   background: '#1a2940',
   border: '1px solid rgba(255,255,255,0.08)',
   borderRadius: '10px',
@@ -104,7 +105,3 @@ const shipItemStyle = {
   border: '1px solid rgba(255,255,255,0.07)',
   borderRadius: '8px',
 }
-
-
-
-

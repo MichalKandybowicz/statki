@@ -489,24 +489,24 @@ export default function GameSetupPage() {
           {filteredShips.length === 0 ? (
             <div style={infoBoxStyle}>Brak statków spełniających aktualne filtry.</div>
           ) : (
-            <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              <FleetPlacer
-                boardSize={boardSize}
-                boardTiles={tiles}
-                availableShips={filteredShips}
-                shipLimit={shipLimit}
-                initialFleet={convertedFleet}
-                onFleetReady={fleet => {
-                  setError('')
-                  socket?.emit('place_fleet', { roomId, fleet })
-                }}
-                onFleetChange={setLocalPlacedShips}
-              />
-              <PlacedFleetSummary
-                placedShips={localPlacedShips}
-                availableShips={filteredShips}
-              />
-            </div>
+            <FleetPlacer
+              boardSize={boardSize}
+              boardTiles={tiles}
+              availableShips={filteredShips}
+              shipLimit={shipLimit}
+              initialFleet={convertedFleet}
+              onFleetReady={fleet => {
+                setError('')
+                socket?.emit('place_fleet', { roomId, fleet })
+              }}
+              onFleetChange={setLocalPlacedShips}
+              sidePanel={(
+                <PlacedFleetSummary
+                  placedShips={localPlacedShips}
+                  availableShips={filteredShips}
+                />
+              )}
+            />
           )}
         </>
       )}

@@ -198,68 +198,66 @@ export default function FleetPlacer({
         onDragEnd={handleShipDragEnd}
       />
 
-      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', alignItems: 'flex-start', flex: '1 1 520px', minWidth: 0 }}>
-        <div style={{ flex: '1 1 420px', minWidth: '320px' }}>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => selectedShip && setRotation(r => (r + 1) % 4)}
-              disabled={!selectedShip}
-              style={{ ...rotateBtnStyle, opacity: selectedShip ? 1 : 0.4 }}
-            >
-              ↻ Rotate (R)
-            </button>
-            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
-              {selectedShip
-                ? `Układasz statek (obrót: ${rotation * 90}°) — przeciągnij lub kliknij planszę`
-                : `Wybierz statek z listy lub przeciągnij na planszę; kliknij statek żeby go usunąć. Limit: ${shipLimit}`}
-            </span>
-          </div>
+      <div style={{ flex: '1 1 420px', minWidth: '320px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <button
+            onClick={() => selectedShip && setRotation(r => (r + 1) % 4)}
+            disabled={!selectedShip}
+            style={{ ...rotateBtnStyle, opacity: selectedShip ? 1 : 0.4 }}
+          >
+            ↻ Rotate (R)
+          </button>
+          <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+            {selectedShip
+              ? `Układasz statek (obrót: ${rotation * 90}°) — przeciągnij lub kliknij planszę`
+              : `Wybierz statek z listy lub przeciągnij na planszę; kliknij statek żeby go usunąć. Limit: ${shipLimit}`}
+          </span>
+        </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <div style={{ display: 'inline-block' }}>
-              {/* Column headers */}
-              <div style={{ display: 'flex', marginLeft: `${labelW}px` }}>
-                {Array.from({ length: boardSize }).map((_, c) => (
-                  <div key={c} style={{ width: `${TILE_SIZE}px`, height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '0.6rem' }}>
-                    {c + 1}
-                  </div>
-                ))}
-              </div>
-
-              {/* Board grid */}
-              <div onDragLeave={handleBoardDragLeave}>
-                {currentBoard.map((row, r) => (
-                  <div key={r} style={{ display: 'flex', alignItems: 'center' }}>
-                    <div style={{ width: `${labelW}px`, textAlign: 'center', color: '#475569', fontSize: '0.6rem', flexShrink: 0 }}>
-                      {String.fromCharCode(65 + r)}
-                    </div>
-                    {row.map((_, c) => (
-                      <div
-                        key={c}
-                        style={cellStyle(r, c)}
-                        onClick={() => handleCellClick(r, c)}
-                        onMouseEnter={() => !isDragging.current && selectedShip && setHoverCell({ r, c })}
-                        onMouseLeave={() => !isDragging.current && setHoverCell(null)}
-                        onDragOver={e => handleCellDragOver(e, r, c)}
-                        onDrop={e => handleCellDrop(e, r, c)}
-                      />
-                    ))}
-                  </div>
-                ))}
-              </div>
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'inline-block' }}>
+            {/* Column headers */}
+            <div style={{ display: 'flex', marginLeft: `${labelW}px` }}>
+              {Array.from({ length: boardSize }).map((_, c) => (
+                <div key={c} style={{ width: `${TILE_SIZE}px`, height: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#475569', fontSize: '0.6rem' }}>
+                  {c + 1}
+                </div>
+              ))}
             </div>
-          </div>
 
-          <div style={{ marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
-            <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{placedShips.length}/{shipLimit} statek/statków ustawionych</span>
-            {placedShips.length === shipLimit && (
-              <button onClick={handleReady} style={readyBtnStyle}>✓ Gotowy!</button>
-            )}
+            {/* Board grid */}
+            <div onDragLeave={handleBoardDragLeave}>
+              {currentBoard.map((row, r) => (
+                <div key={r} style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ width: `${labelW}px`, textAlign: 'center', color: '#475569', fontSize: '0.6rem', flexShrink: 0 }}>
+                    {String.fromCharCode(65 + r)}
+                  </div>
+                  {row.map((_, c) => (
+                    <div
+                      key={c}
+                      style={cellStyle(r, c)}
+                      onClick={() => handleCellClick(r, c)}
+                      onMouseEnter={() => !isDragging.current && selectedShip && setHoverCell({ r, c })}
+                      onMouseLeave={() => !isDragging.current && setHoverCell(null)}
+                      onDragOver={e => handleCellDragOver(e, r, c)}
+                      onDrop={e => handleCellDrop(e, r, c)}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
+        <div style={{ marginTop: '14px', display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <span style={{ color: '#64748b', fontSize: '0.82rem' }}>{placedShips.length}/{shipLimit} statek/statków ustawionych</span>
+          {placedShips.length === shipLimit && (
+            <button onClick={handleReady} style={readyBtnStyle}>✓ Gotowy!</button>
+          )}
+        </div>
+
         {sidePanel && (
-          <div style={{ flex: '1 1 260px', minWidth: '260px', maxWidth: '320px' }}>
+          <div style={{ marginTop: '14px' }}>
             {sidePanel}
           </div>
         )}
