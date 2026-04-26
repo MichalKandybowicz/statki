@@ -278,6 +278,65 @@ export default function GameSetupPage() {
               Plansza: {boardSize}×{boardSize} · Limit statków: {shipLimit} · Tura: {room.settings?.turnTimeLimit}s · Tryb: {room?.isRanked ? 'Rankingowy' : 'Nierankingowy'}
             </p>
           )}
+          {!isReady && (
+              <div style={{ marginBottom: '14px', background: '#14263b', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '10px', padding: '12px' }}>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                  {flowSteps.map((step, index) => (
+                      <div
+                          key={step.label}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '7px',
+                            background: step.done ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.05)',
+                            border: step.done ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                            color: step.done ? '#86efac' : '#cbd5e1',
+                            borderRadius: '999px',
+                            padding: '5px 10px',
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                          }}
+                      >
+                        <span>{index + 1}.</span>
+                        <span>{step.label}</span>
+                        <span>{step.done ? '✓' : ''}</span>
+                      </div>
+                  ))}
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: '0.76rem' }}>
+                  Plansza: 10×10 · Limit statków: 9 · Tura: 60s · Tryb: Nierankingowy
+                </div>
+              </div>
+          )}
+
+          <div style={{ marginBottom:'12px', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'8px', alignItems:'center' }}>
+            <input
+                value={shipSearch}
+                onChange={(e) => setShipSearch(e.target.value)}
+                placeholder='Szukaj statku po nazwie/autorze...'
+                style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
+            />
+            <select
+                value={shipAbilityFilter}
+                onChange={(e) => setShipAbilityFilter(e.target.value)}
+                style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
+            >
+              <option value='all'>Wszystkie umiejętności</option>
+              <option value='linear'>Liniowa</option>
+              <option value='diagonal'>Skośna</option>
+              <option value='random'>Losowa</option>
+              <option value='target'>Precyzyjna</option>
+              <option value='sonar'>Sonar</option>
+              <option value='scout_rocket'>Rakieta zwiadowcza</option>
+              <option value='holy_bomb'>Święta bomba</option>
+              <option value='ship_shape'>Kształt statku</option>
+            </select>
+            <label style={{ display:'flex', alignItems:'center', gap:'6px', color:'#cbd5e1', fontSize:'0.82rem' }}>
+              <input type='checkbox' checked={includeCommunityShips} onChange={(e) => setIncludeCommunityShips(e.target.checked)} />
+              Statki społeczności
+            </label>
+          </div>
         </div>
 
         <div style={sideCardStyle}>
@@ -342,11 +401,7 @@ export default function GameSetupPage() {
                >
                  {startingGame ? 'Uruchamianie…' : 'Start gry'}
                </button>
-               {!canStartGame && startBlockedReason && (
-                 <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '8px', marginBottom: 0 }}>
-                   {startBlockedReason}
-                 </p>
-               )}
+
 
                 <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
                  <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
@@ -455,36 +510,7 @@ export default function GameSetupPage() {
         </div>
       )}
 
-      {!isReady && (
-        <div style={{ marginBottom: '14px', background: '#14263b', border: '1px solid rgba(255,255,255,0.09)', borderRadius: '10px', padding: '12px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-            {flowSteps.map((step, index) => (
-              <div
-                key={step.label}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '7px',
-                  background: step.done ? 'rgba(34,197,94,0.16)' : 'rgba(255,255,255,0.05)',
-                  border: step.done ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                  color: step.done ? '#86efac' : '#cbd5e1',
-                  borderRadius: '999px',
-                  padding: '5px 10px',
-                  fontSize: '0.78rem',
-                  fontWeight: 600,
-                }}
-              >
-                <span>{index + 1}.</span>
-                <span>{step.label}</span>
-                <span>{step.done ? '✓' : ''}</span>
-              </div>
-            ))}
-          </div>
-          <div style={{ color: '#94a3b8', fontSize: '0.76rem' }}>
-            Drag ship onto board · Press R to rotate · Click ship to remove
-          </div>
-        </div>
-      )}
+
 
       {boardLoading ? (
         <div style={infoBoxStyle}>Ładowanie planszy…</div>
@@ -509,33 +535,7 @@ export default function GameSetupPage() {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom:'12px', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'8px', alignItems:'center' }}>
-            <input
-              value={shipSearch}
-              onChange={(e) => setShipSearch(e.target.value)}
-              placeholder='Szukaj statku po nazwie/autorze...'
-              style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
-            />
-            <select
-              value={shipAbilityFilter}
-              onChange={(e) => setShipAbilityFilter(e.target.value)}
-              style={{ background:'#0f1923', color:'#e2e8f0', border:'1px solid rgba(255,255,255,0.12)', borderRadius:'8px', padding:'8px 10px', fontSize:'0.84rem' }}
-            >
-              <option value='all'>Wszystkie umiejętności</option>
-              <option value='linear'>Liniowa</option>
-              <option value='diagonal'>Skośna</option>
-              <option value='random'>Losowa</option>
-              <option value='target'>Precyzyjna</option>
-              <option value='sonar'>Sonar</option>
-              <option value='scout_rocket'>Rakieta zwiadowcza</option>
-              <option value='holy_bomb'>Święta bomba</option>
-              <option value='ship_shape'>Kształt statku</option>
-            </select>
-            <label style={{ display:'flex', alignItems:'center', gap:'6px', color:'#cbd5e1', fontSize:'0.82rem' }}>
-              <input type='checkbox' checked={includeCommunityShips} onChange={(e) => setIncludeCommunityShips(e.target.checked)} />
-              Statki społeczności
-            </label>
-          </div>
+
 
           {filteredShips.length === 0 ? (
             <div style={infoBoxStyle}>Brak statków spełniających aktualne filtry.</div>

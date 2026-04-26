@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { rotateShape, getShipCells, canPlaceShip, trimShapeToBoundingBox } from '../../utils/boardUtils.js'
 import ShipSelector from './ShipSelector.jsx'
 
-const TILE_SIZE = 34
+const MAX_TILE_SIZE = 34
+const MIN_TILE_SIZE = 18
 
 function applyRotations(shape, times) {
   let s = trimShapeToBoundingBox(shape)
@@ -48,7 +49,9 @@ export default function FleetPlacer({
   const [feedback, setFeedback] = useState('Przeciagnij statek na plansze')
   const [feedbackType, setFeedbackType] = useState('hint')
   const [recentPlacement, setRecentPlacement] = useState([])
+  const [tileSize, setTileSize] = useState(MAX_TILE_SIZE)
   const isDragging = useRef(false)
+  const boardViewportRef = useRef(null)
 
   useEffect(() => {
     if (boardTiles) setBaseTiles(boardTiles.map(r => [...r]))
@@ -91,6 +94,28 @@ export default function FleetPlacer({
     const tid = setTimeout(() => setRecentPlacement([]), 260)
     return () => clearTimeout(tid)
   }, [recentPlacement])
+
+  useEffect(() => {
+    const el = boardViewportRef.current
+    if (!el) return
+
+    function recalcSize() {
+      const available = el.clientWidth - 10
+      if (!available || boardSize <= 0) return
+      const next = Math.floor((available - MAX_TILE_SIZE) / boardSize)
+      const clamped = Math.max(MIN_TILE_SIZE, Math.min(MAX_TILE_SIZE, next))
+      setTileSize(clamped)
+    }
+
+    recalcSize()
+    const ro = new ResizeObserver(recalcSize)
+    ro.observe(el)
+    window.addEventListener('resize', recalcSize)
+    return () => {
+      ro.disconnect()
+      window.removeEventListener('resize', recalcSize)
+    }
+  }, [boardSize])
 
   const currentBoard = buildBoard(baseTiles, placedShips)
 
@@ -274,8 +299,8 @@ export default function FleetPlacer({
     }
 
     return {
-      width: `${TILE_SIZE}px`,
-      height: `${TILE_SIZE}px`,
+      width: `${tileSize}px`,
+      height: `${tileSize}px`,
       background: bg,
       border,
       cursor: selectedShip ? 'crosshair' : (tile === 'ship' ? 'pointer' : 'default'),
@@ -297,7 +322,7 @@ export default function FleetPlacer({
     onFleetReady(fleet)
   }
 
-  const labelW = TILE_SIZE
+  const labelW = tileSize
 
   return (
     <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -339,13 +364,14 @@ export default function FleetPlacer({
         </div>
 
         <div
+          ref={boardViewportRef}
           style={{ overflowX: 'auto', background: '#102236', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px' }}
           onWheel={handleBoardWheel}
         >
           <div style={{ display: 'inline-block' }}>
             <div style={{ display: 'flex', marginLeft: `${labelW}px` }}>
               {Array.from({ length: boardSize }).map((_, c) => (
-                <div key={c} style={{ width: `${TILE_SIZE}px`, height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.62rem' }}>
+                <div key={c} style={{ width: `${tileSize}px`, height: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b', fontSize: '0.62rem' }}>
                   {c + 1}
                 </div>
               ))}
