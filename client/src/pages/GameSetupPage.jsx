@@ -226,6 +226,15 @@ export default function GameSetupPage() {
   const isReady = !!currentPlayer?.ready
   const playersReady = uniquePlayers.filter(player => player.ready).length
   const canStartGame = isHost && uniquePlayers.length === 2 && playersReady === 2 && room?.status !== 'in_game'
+  const startBlockedReason = !isHost
+    ? ''
+    : room?.status === 'in_game'
+      ? 'Gra już trwa.'
+      : uniquePlayers.length < 2
+        ? 'Czekasz na dołączenie drugiego gracza.'
+        : playersReady < 2
+          ? `Do startu potrzeba 2 gotowych graczy (aktualnie: ${playersReady}/2).`
+          : ''
 
   function handleStartGame() {
     if (!socket || !canStartGame) return
@@ -327,8 +336,13 @@ export default function GameSetupPage() {
                >
                  {startingGame ? 'Uruchamianie…' : 'Start gry'}
                </button>
+               {!canStartGame && startBlockedReason && (
+                 <p style={{ color: '#94a3b8', fontSize: '0.78rem', marginTop: '8px', marginBottom: 0 }}>
+                   {startBlockedReason}
+                 </p>
+               )}
 
-               <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
+                <div style={{ marginTop: '12px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '12px' }}>
                  <label style={{ display: 'block', color: '#cbd5e1', fontSize: '0.85rem', marginBottom: '6px', fontWeight: 600 }}>
                    Liczba statków:
                  </label>
@@ -458,7 +472,7 @@ export default function GameSetupPage() {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom:'12px', display:'grid', gridTemplateColumns:'minmax(200px, 1fr) minmax(180px, 220px) auto', gap:'8px', alignItems:'center' }}>
+          <div style={{ marginBottom:'12px', display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'8px', alignItems:'center' }}>
             <input
               value={shipSearch}
               onChange={(e) => setShipSearch(e.target.value)}
@@ -480,7 +494,7 @@ export default function GameSetupPage() {
               <option value='holy_bomb'>Święta bomba</option>
               <option value='ship_shape'>Kształt statku</option>
             </select>
-            <label style={{ display:'flex', alignItems:'center', gap:'6px', color:'#cbd5e1', fontSize:'0.82rem', whiteSpace:'nowrap' }}>
+            <label style={{ display:'flex', alignItems:'center', gap:'6px', color:'#cbd5e1', fontSize:'0.82rem' }}>
               <input type='checkbox' checked={includeCommunityShips} onChange={(e) => setIncludeCommunityShips(e.target.checked)} />
               Statki społeczności
             </label>

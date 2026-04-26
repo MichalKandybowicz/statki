@@ -127,23 +127,22 @@ router.get('/leaderboard', authMiddleware, async (req, res) => {
     let previousElo = null;
     let previousRank = 0;
 
-    const items = players.map((u, index) => {
-      const numericElo = Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800;
-      if (index === 0 || numericElo !== previousElo) {
-        previousElo = numericElo;
-        previousRank = index + 1;
-      }
-
-      return {
-        rank: previousRank,
+    res.json({
+      items: players.map((u, index) => ({
+        rank: (() => {
+          const numericElo = Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800;
+          if (index === 0 || numericElo !== previousElo) {
+            previousElo = numericElo;
+            previousRank = index + 1;
+          }
+          return previousRank;
+        })(),
         userId: u._id.toString(),
         username: displayName(u),
-        elo: numericElo,
+        elo: Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800,
         gamesPlayed: Number(u.gamesPlayed) || 0,
-      };
+      })),
     });
-
-    res.json({ items });
   } catch (err) {
     console.error('Leaderboard error:', err);
     res.status(500).json({ error: 'Failed to load leaderboard' });

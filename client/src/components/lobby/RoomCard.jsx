@@ -7,12 +7,9 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
   const roomId = room._id || room.id
   const hostName = room.hostId?.username || room.hostId?.email?.split('@')[0] || room.host?.username || room.host?.email?.split('@')[0] || 'Nieznany gospodarz'
 
-  // Detect if current user is the host
-  const hostId = room.hostId?._id || room.host?._id || room.host || room.hostId
-  const isHost = hostId === currentUserId ||
-    room.players?.[0]?.userId?._id === currentUserId ||
-    room.players?.[0]?._id === currentUserId ||
-    room.players?.[0] === currentUserId
+  const hostId = String(room.hostId?._id || room.host?._id || room.host || room.hostId || '')
+  const currentId = String(currentUserId || '')
+  const isHost = hostId && currentId && hostId === currentId
 
   const hasPassword = room.hasPassword || !!room.password
   const isRanked = !!room.isRanked
@@ -20,15 +17,21 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
   const statusColor = statusColors[room.status] || '#94a3b8'
   const isDeleting = deletingRoomId === roomId
 
+  const joinBlockedReason = room.status === 'in_game'
+    ? 'Pokój jest już w trakcie gry.'
+    : isFull
+      ? 'Pokój jest pełny.'
+      : ''
+
   return (
     <div style={cardStyle}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
           <span style={{ color: '#e2e8f0', fontWeight: '600', fontSize: '0.95rem' }}>
             Lobby {(roomId || '').slice(-6)}
           </span>
           {hasPassword && (
-            <span title="Password protected" style={{ fontSize: '0.85rem' }}>🔒</span>
+            <span title='Pokój chroniony hasłem' style={{ fontSize: '0.85rem' }}>🔒</span>
           )}
           <span style={{ color: statusColor, fontSize: '0.75rem', fontWeight: '600', textTransform: 'uppercase' }}>
             {room.status || 'waiting'}
@@ -44,7 +47,7 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
               padding: '2px 7px',
             }}
           >
-            {isRanked ? 'RANKED' : 'CASUAL'}
+            {isRanked ? 'RANKINGOWY' : 'CASUAL'}
           </span>
         </div>
         <div style={{ color: '#94a3b8', fontSize: '0.78rem', marginBottom: '6px' }}>
@@ -52,12 +55,12 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
         </div>
         <div style={{ display: 'flex', gap: '16px', color: '#64748b', fontSize: '0.8rem', flexWrap: 'wrap' }}>
           <span>Plansza {boardSize}×{boardSize}</span>
-          <span>Players {playerCount}/2</span>
+          <span>Gracze {playerCount}/2</span>
           <span>Tura {turnTimeLimit}s</span>
           <span>Statki {shipLimit}</span>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+      <div style={{ display: 'flex', gap: '8px', flexShrink: 0, flexDirection: 'column', alignItems: 'flex-end' }}>
         {isHost ? (
           <>
             <button
@@ -79,17 +82,23 @@ export default function RoomCard({ room, onJoin, onOpenOwnRoom, onDeleteOwnRoom,
             </button>
           </>
         ) : (
-          <button
-            onClick={() => onJoin(room)}
-            disabled={isFull || room.status === 'in_game'}
-            style={{
-              ...joinBtnStyle,
-              opacity: (isFull || room.status === 'in_game') ? 0.45 : 1,
-              cursor: (isFull || room.status === 'in_game') ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {isFull ? 'Pełny' : room.status === 'in_game' ? 'W grze' : 'Dołącz'}
-          </button>
+          <>
+            <button
+              onClick={() => onJoin(room)}
+              disabled={!!joinBlockedReason}
+              title={joinBlockedReason || 'Dołącz do lobby'}
+              style={{
+                ...joinBtnStyle,
+                opacity: joinBlockedReason ? 0.45 : 1,
+                cursor: joinBlockedReason ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {joinBlockedReason ? 'Niedostępne' : 'Dołącz'}
+            </button>
+            {joinBlockedReason && (
+              <span style={{ color: '#64748b', fontSize: '0.72rem' }}>{joinBlockedReason}</span>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -127,4 +136,3 @@ const deleteBtnStyle = {
   fontSize: '0.82rem',
   fontWeight: '600',
 }
-
