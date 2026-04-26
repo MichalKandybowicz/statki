@@ -67,21 +67,7 @@ export default function GameSetupPage() {
     setShipsLoading(true)
     setShipsLoadError('')
     console.log('[GameSetupPage] loading ships catalog...')
-
-    // Timeout helper - if requests take longer than 8 seconds, consider it failed
-    const withTimeout = (promise, ms, label) => {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error(`Timeout loading ${label}`)), ms)
-        )
-      ])
-    }
-
-    const [ownRes, communityRes] = await Promise.allSettled([
-      withTimeout(shipsApi.list(), 8000, 'own ships'),
-      withTimeout(shipsApi.listCommunity(), 8000, 'community ships')
-    ])
+    const [ownRes, communityRes] = await Promise.allSettled([shipsApi.list(), shipsApi.listCommunity()])
 
     const own = ownRes.status === 'fulfilled' ? (ownRes.value.data || []) : []
     const community = communityRes.status === 'fulfilled' ? (communityRes.value.data || []) : []
@@ -397,7 +383,7 @@ export default function GameSetupPage() {
                    cursor: 'pointer',
                  }}
                >
-                 {showMapPicker ? 'Ukryj wybór mapy' : '🗺 Zmień mapę'}
+                 {showMapPicker ? 'Ukryj wybór mapy' : ' Zmień mapę'}
                </button>
                {showMapPicker && (
                 <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -515,12 +501,10 @@ export default function GameSetupPage() {
                   socket?.emit('place_fleet', { roomId, fleet })
                 }}
                 onFleetChange={setLocalPlacedShips}
-                sidePanel={(
-                  <PlacedFleetSummary
-                    placedShips={localPlacedShips}
-                    availableShips={filteredShips}
-                  />
-                )}
+              />
+              <PlacedFleetSummary
+                placedShips={localPlacedShips}
+                availableShips={filteredShips}
               />
             </div>
           )}

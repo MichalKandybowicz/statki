@@ -74,20 +74,76 @@ router.get('/history', authMiddleware, async (req, res) => {
 router.get('/leaderboard', authMiddleware, async (req, res) => {
   try {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
-    const players = await User.find({})
-      .select('username email elo createdAt')
-      .sort({ elo: -1, createdAt: 1, _id: 1 })
-      .limit(limit)
-      .lean();
+    const players = await User.aggregate([
+      {
+        $project: {
+          username: 1,
+          email: 1,
+          createdAt: 1,
+          elo: {
+            $convert: {
+              input: '$elo',
+              to: 'double',
+              onError: 800,
+              onNull: 800,
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: 'games',
+          let: { userId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$status', 'finished'] },
+                    { $eq: ['$isRanked', true] },
+                    { $in: ['$$userId', '$players'] },
+                  ],
+                },
+              },
+            },
+            { $count: 'total' },
+          ],
+          as: 'rankedStats',
+        },
+      },
+      {
+        $addFields: {
+          gamesPlayed: {
+            $ifNull: [{ $arrayElemAt: ['$rankedStats.total', 0] }, 0],
+          },
+        },
+      },
+      { $match: { gamesPlayed: { $gte: 3 } } },
+      { $sort: { elo: -1, createdAt: 1, _id: 1 } },
+      { $limit: limit },
+      { $project: { username: 1, email: 1, elo: 1, gamesPlayed: 1 } },
+    ]);
 
-    res.json({
-      items: players.map((u, index) => ({
-        rank: index + 1,
+    let previousElo = null;
+    let previousRank = 0;
+
+    const items = players.map((u, index) => {
+      const numericElo = Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800;
+      if (index === 0 || numericElo !== previousElo) {
+        previousElo = numericElo;
+        previousRank = index + 1;
+      }
+
+      return {
+        rank: previousRank,
         userId: u._id.toString(),
         username: displayName(u),
-        elo: Number.isFinite(Number(u.elo)) ? Number(u.elo) : 800,
-      })),
+        elo: numericElo,
+        gamesPlayed: Number(u.gamesPlayed) || 0,
+      };
     });
+
+    res.json({ items });
   } catch (err) {
     console.error('Leaderboard error:', err);
     res.status(500).json({ error: 'Failed to load leaderboard' });

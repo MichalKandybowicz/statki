@@ -229,7 +229,10 @@ export default function ProfilePage() {
                 {leaderboard.map((row) => (
                   <div key={row.userId} style={{ display: 'flex', justifyContent: 'space-between', color: '#cbd5e1', fontSize: '0.84rem' }}>
                     <span>#{row.rank} {row.username}</span>
-                    <b style={{ color: '#fbbf24' }}>{row.elo}</b>
+                    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: '8px' }}>
+                      <b style={{ color: '#fbbf24' }}>{row.elo}</b>
+                      <span style={{ color: '#94a3b8', fontSize: '0.74rem' }}>{Number(row.gamesPlayed) || 0} gier rank.</span>
+                    </span>
                   </div>
                 ))}
               </div>

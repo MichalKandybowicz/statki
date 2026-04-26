@@ -208,7 +208,11 @@ export default function FleetPlacer({
             >
               ↻ Rotate (R)
             </button>
-
+            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>
+              {selectedShip
+                ? `Układasz statek (obrót: ${rotation * 90}°) — przeciągnij lub kliknij planszę`
+                : `Wybierz statek z listy lub przeciągnij na planszę; kliknij statek żeby go usunąć. Limit: ${shipLimit}`}
+            </span>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
